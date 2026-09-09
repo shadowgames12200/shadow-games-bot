@@ -1,0 +1,15 @@
+const fs = require('fs');
+const path = require('path');
+const { EmbedBuilder } = require('discord.js');
+const { db, save } = require('./ProfessionalSuite');
+const dataDir = path.join(__dirname, 'DataBaseJson');
+const backupDir = path.join(dataDir, 'backups');
+function ensure() { db.warnings ||= {}; db.settings ||= {}; db.settings.backupRetention ||= 14; save(); }
+function backup(label = 'manual') { fs.mkdirSync(backupDir, { recursive: true }); const stamp = new Date().toISOString().replace(/[:.]/g, '-'); const target = path.join(backupDir, `${stamp}-${label}.json`); const payload = {}; for (const file of fs.readdirSync(dataDir)) { if (!file.endsWith('.json')) continue; try { payload[file] = JSON.parse(fs.readFileSync(path.join(dataDir, file), 'utf8')); } catch {} } fs.writeFileSync(target, JSON.stringify(payload, null, 2)); const files = fs.readdirSync(backupDir).sort().reverse(); for (const file of files.slice(Number(db.settings.backupRetention || 14))) fs.rmSync(path.join(backupDir, file), { force: true }); return target; }
+function addWarning(guildId, userId, moderatorId, reason) { db.warnings[guildId] ||= {}; db.warnings[guildId][userId] ||= []; const item = { id: `${Date.now()}-${userId}`, moderatorId, reason, at: new Date().toISOString(), active: true }; db.warnings[guildId][userId].push(item); save(); return item; }
+function clearWarnings(guildId, userId) { if (db.warnings[guildId]) db.warnings[guildId][userId] = []; save(); }
+function getWarnings(guildId, userId) { return db.warnings[guildId]?.[userId] || []; }
+function findOrders(userId, channelId) { const file = path.join(dataDir, 'pedidos.json'); try { const raw = JSON.parse(fs.readFileSync(file, 'utf8')); const values = Array.isArray(raw) ? raw : Object.values(raw); return values.filter(x => String(x.userId || x.usuario || x.cliente || x.discordId || '').includes(userId) || String(x.channelId || x.canalId || '').includes(channelId)).slice(-10); } catch { return []; } }
+function orderEmbed(orders) { if (!orders.length) return null; return new EmbedBuilder().setColor(0x5865f2).setTitle('Pedidos relacionados').setDescription(orders.map((o, i) => `**${i + 1}.** ${o.id || o.ID || o.pedido || 'sem ID'} · ${o.status || o.estado || 'status não informado'} · ${o.produto || o.product || o.item || 'produto não informado'}`).join('\n').slice(0, 4000)); }
+function install(client) { ensure(); try { backup('startup'); } catch (e) { console.error('[ProductionSuite] backup:', e.message); } setInterval(() => { try { backup('scheduled'); } catch (e) { console.error('[ProductionSuite] backup:', e.message); } }, 6 * 60 * 60 * 1000); client.on('messageCreate', message => { if (!message.guild || message.author.bot || !db.tickets[message.channelId]) return; const orders = findOrders(message.author.id, message.channelId); if (orders.length && !message.channel.__ordersShown) { message.channel.__ordersShown = true; const embed = orderEmbed(orders); if (embed) message.channel.send({ embeds: [embed] }).catch(() => {}); } }); }
+module.exports = { install, ensure, backup, addWarning, clearWarnings, getWarnings, findOrders, orderEmbed };

@@ -1,0 +1,15 @@
+node_modules/
+DataBaseJson/*.json
+DataBaseJson/backups/
+DataBaseJson/.gitkeep
+json.sqlite
+*.zip
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.log
+.DS_Store
