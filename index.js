@@ -6,7 +6,7 @@ const { install: installProfessionalSuite } = require('./ProfessionalSuite');
 const { install: installGovernance } = require('./GovernanceSuite');
 const { install: installProduction } = require('./ProductionSuite');
 const { install: installSecurity } = require('./SecuritySuite');
-const { install: installTicketControl } = require('./TicketControlSuite');
+const { install: installTicketControl } = require('./TicketControlSuiteEnhanced');
 const { ensure: ensurePayments } = require('./PaymentProviders');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.DirectMessages] });
 const estatisticasNodeInstance = require('./Functions/VariaveisEstatisticas');
@@ -23,8 +23,8 @@ installProfessionalSuite(client);
 installGovernance(client);
 installProduction(client);
 installSecurity(client);
-// TicketControlSuite é o único roteador oficial de tickets.
-// AdvancedSupport e ShadowControlSuite não são instalados para evitar listeners e fluxos duplicados.
+// TicketControlSuiteEnhanced é o único roteador oficial de tickets.
+// Os sistemas antigos não são instalados para evitar listeners duplicados.
 installTicketControl(client);
 ensurePayments();
 const token = process.env.DISCORD_TOKEN || config.token;
