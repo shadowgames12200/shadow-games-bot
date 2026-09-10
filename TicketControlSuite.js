@@ -1,6 +1,6 @@
 const {
   Events, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle,
-  EmbedBuilder, PermissionFlagsBits, ChannelType, AttachmentBuilder
+  EmbedBuilder, PermissionFlagsBits, ChannelType, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle
 } = require('discord.js');
 const { db, save } = require('./ProfessionalSuite');
 
@@ -14,6 +14,7 @@ const PURPLE = '#7c3aed';
 
 function ensure() {
   db.ticketConfig ||= {};
+  db.ticketStats ||= { opened: 0, closed: 0, ratings: [] };
   Object.assign(db.ticketConfig, {
     panelTitle: 'Central de Atendimento | Shadow Games',
     panelDescription: 'Ao abrir um ticket, um integrante da equipe irá lhe responder. Nosso atendimento é privado, rápido e eficiente, disponível 24 horas por dia, sujeito à disponibilidade em horários de pico.',
@@ -65,6 +66,7 @@ function purchasePanel(interaction) {
 }
 async function createTicket(interaction, key) {
   const team = teamFor(key), guild = interaction.guild;
+  db.ticketStats ||= { opened: 0, closed: 0, ratings: [] };
   const existing = guild.channels.cache.find(channel => topicInfo(channel).userId === interaction.user.id && topicInfo(channel).team === key);
   if (existing) return interaction.reply({ content: `Você já possui um ticket aberto nesta categoria: ${existing}`, ephemeral: true });
   const permissions = [
@@ -77,6 +79,7 @@ async function createTicket(interaction, key) {
   const embed = new EmbedBuilder().setColor(PURPLE).setTitle(`🎫 ${team.name}`).setDescription(`Olá ${interaction.user}, seu ticket foi criado!\n\nNossa equipe irá atendê-lo em breve.\n\n**Categoria:** ${team.name}\n**Solicitante:** ${interaction.user.tag}`);
   await channel.send({ content: `${interaction.user}${team.roleId ? ` <@&${team.roleId}>` : ''}`, embeds: [embed], components: [ticketButtons(), optionMenu()] });
   if (key === 'suporte' || key === 'financeiro') await channel.send(purchasePanel(interaction));
+  db.ticketStats.opened = (db.ticketStats.opened || 0) + 1; save();
   return interaction.reply({ content: `✅ Seu ticket foi criado: ${channel}`, ephemeral: true });
 }
 async function notifyTeam(interaction) {
@@ -115,6 +118,9 @@ async function closeTicket(interaction) {
   await interaction.deferReply({ ephemeral: true });
   const content = await transcript(interaction.channel), log = db.ticketConfig.logsChannelId ? await interaction.guild.channels.fetch(db.ticketConfig.logsChannelId).catch(() => null) : null;
   if (log?.isTextBased()) await log.send({ content: `📁 Ticket fechado: **${interaction.channel.name}** por ${interaction.user}\nSolicitante: <@${info.userId}>`, files: [new AttachmentBuilder(Buffer.from(content || 'Sem mensagens.'), { name: `${interaction.channel.name}.txt` })] });
+  db.ticketStats ||= { opened: 0, closed: 0, ratings: [] }; db.ticketStats.closed = (db.ticketStats.closed || 0) + 1; save();
+  const requester = await interaction.guild.members.fetch(info.userId).catch(() => null);
+  if (requester) requester.send({ content: 'Como foi o atendimento deste ticket?', components: [new ActionRowBuilder().addComponents(...[1,2,3,4,5].map(n => new ButtonBuilder().setCustomId(`ticket_rate_${n}`).setLabel(String(n)).setStyle(ButtonStyle.Secondary)))] }).catch(() => {});
   await interaction.editReply({ content: '✅ Transcrição completa salva. O ticket será deletado em instantes.' });
   setTimeout(() => interaction.channel.delete('Ticket encerrado após salvar transcrição').catch(() => {}), 1500);
 }
@@ -125,21 +131,63 @@ async function handlePurchase(interaction) {
   await interaction.channel.send(`📦 **Compra vinculada ao ticket**\n${summary}\nSolicitante: ${interaction.user}`);
   return interaction.reply({ content: '✅ A compra foi vinculada ao ticket e a equipe já pode analisá-la.', ephemeral: true });
 }
+function adminPanel() {
+  const c = db.ticketConfig;
+  const stats = db.ticketStats || { opened: 0, closed: 0, ratings: [] };
+  const embed = new EmbedBuilder().setColor(c.panelColor || PURPLE).setTitle('⚙️ Administração de Tickets').setDescription(`**Painel:** ${c.panelTitle}\n**Logs:** ${c.logsChannelId || 'não configurado'}\n**Banner:** ${c.panelImage ? 'configurado' : 'não configurado'}\n**Tickets abertos:** ${stats.opened || 0}\n**Tickets fechados:** ${stats.closed || 0}`);
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_admin').setPlaceholder('Escolha uma configuração').addOptions(
+    { label: 'Alterar banner', value: 'banner', emoji: '🖼️' },
+    { label: 'Definir canal de logs', value: 'logs', emoji: '📝' },
+    { label: 'Alterar cor roxa', value: 'color', emoji: '🎨' },
+    { label: 'Ver estatísticas', value: 'stats', emoji: '📊' }
+  ))] };
+}
+function configModal(kind) {
+  const labels = { banner: ['ticket_banner', 'URL do banner', db.ticketConfig.panelImage || ''], logs: ['ticket_logs', 'ID do canal de logs', db.ticketConfig.logsChannelId || ''], color: ['ticket_color', 'Cor hexadecimal', db.ticketConfig.panelColor || PURPLE] };
+  const [id, label, value] = labels[kind];
+  return new ModalBuilder().setCustomId(`ticket_config_${kind}`).setTitle(label).addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(TextInputStyle.Short).setRequired(true).setValue(String(value).slice(0, 100))));
+}
+async function handleAdmin(interaction) {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return interaction.reply({ content: '❌ Apenas administradores podem configurar os tickets.', ephemeral: true });
+  const choice = interaction.values[0];
+  if (choice === 'stats') { const stats = db.ticketStats || {}; return interaction.reply({ content: `📊 Tickets abertos: **${stats.opened || 0}**\nTickets fechados: **${stats.closed || 0}**\nAvaliações: **${(stats.ratings || []).length}**`, ephemeral: true }); }
+  return interaction.showModal(configModal(choice));
+}
+async function handleAdminModal(interaction) {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return interaction.reply({ content: '❌ Apenas administradores podem alterar essa configuração.', ephemeral: true });
+  const kind = interaction.customId.replace('ticket_config_', '');
+  const value = interaction.fields.getTextInputValue(`ticket_${kind}`);
+  if (kind === 'banner') db.ticketConfig.panelImage = value;
+  if (kind === 'logs') db.ticketConfig.logsChannelId = value.replace(/[^0-9]/g, '');
+  if (kind === 'color') db.ticketConfig.panelColor = /^#[0-9a-f]{6}$/i.test(value) ? value : PURPLE;
+  save();
+  return interaction.reply({ content: '✅ Configuração salva. O próximo painel usará a nova configuração.', ephemeral: true });
+}
+async function rateTicket(interaction) {
+  db.ticketStats ||= { opened: 0, closed: 0, ratings: [] };
+  db.ticketStats.ratings ||= [];
+  db.ticketStats.ratings.push({ userId: interaction.user.id, rating: Number(interaction.customId.split('_').pop()), at: new Date().toISOString() });
+  save();
+  return interaction.reply({ content: '✅ Obrigado por avaliar o atendimento!', ephemeral: true });
+}
+
 async function install(client) {
   ensure();
   client.on(Events.InteractionCreate, async interaction => {
     try {
       if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category') return createTicket(interaction, interaction.values[0]);
       if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_purchase') return handlePurchase(interaction);
+      if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_admin') return handleAdmin(interaction);
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('ticket_config_')) return handleAdminModal(interaction);
+      if (interaction.isButton() && interaction.customId.startsWith('ticket_rate_')) return rateTicket(interaction);
       if (interaction.isButton() && interaction.customId === 'ticket_notify') return notifyTeam(interaction);
       if (interaction.isButton() && interaction.customId === 'ticket_claim') return claimTicket(interaction);
       if (interaction.isButton() && interaction.customId === 'ticket_close') return closeTicket(interaction);
       if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_options') return interaction.reply({ content: interaction.values[0] === 'purchase' ? 'Use o menu de compras enviado neste ticket para vincular um pedido.' : interaction.values[0] === 'staff' ? '🛠️ Ferramentas Staff: assumir, notificar e salvar o ticket.' : '👤 Você pode enviar mensagens, anexos e informações do pedido neste ticket.', ephemeral: true });
-      if (interaction.isChatInputCommand() && interaction.commandName === 'ticket' && interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return interaction.reply(panel());
     } catch (error) {
       console.error('[TicketControlSuite]', error);
       if (!interaction.replied && !interaction.deferred) interaction.reply({ content: '❌ Não foi possível concluir essa ação. Verifique as permissões do bot.', ephemeral: true }).catch(() => {});
     }
   });
 }
-module.exports = { install, panel, ensure };
+module.exports = { install, panel, adminPanel, ensure };
