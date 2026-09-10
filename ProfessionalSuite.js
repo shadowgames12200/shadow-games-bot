@@ -6,6 +6,7 @@ const {
   ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits
 } = require('discord.js');
 
+
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'DataBaseJson');
 const DATA_FILE = path.join(DATA_DIR, 'professional.json');
@@ -17,8 +18,9 @@ const DEFAULTS = {
 };
 function clone(v) { return JSON.parse(JSON.stringify(v)); }
 function load() { try { return { ...clone(DEFAULTS), ...JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) }; } catch { fs.mkdirSync(DATA_DIR, { recursive: true }); save(clone(DEFAULTS)); return clone(DEFAULTS); } }
-let db = load();
+let db;
 function save(next = db) { db = next; fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2)); }
+db = load();
 function allowed(member, key) { const ids = db.permissions[key] || []; return !ids.length || member.permissions.has(PermissionFlagsBits.Administrator) || ids.some(id => member.roles.cache.has(id)); }
 async function log(client, guild, title, description, color = 0x5865f2) { const id = db.settings.logChannelId; if (!id) return; const ch = await guild.channels.fetch(id).catch(() => null); if (ch?.isTextBased()) await ch.send({ embeds: [new EmbedBuilder().setColor(color).setTitle(title).setDescription(description).setTimestamp()] }).catch(() => {}); }
 function transcript(channel, messages) { return `<!doctype html><html lang="pt-br"><meta charset="utf-8"><title>Transcript ${channel.name}</title><style>body{font:15px system-ui;background:#0f1117;color:#e6e9ef;max-width:1000px;margin:40px auto;padding:0 20px}article{padding:12px;border-bottom:1px solid #2b3040}small{color:#9aa4b2}a{color:#78a9ff}</style><h1>${channel.name}</h1>${messages.map(m => `<article><b>${m.author?.tag || 'usuário'}</b> <small>${new Date(m.createdTimestamp).toISOString()}</small><div>${String(m.cleanContent || '').replace(/[&<>]/g, x => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[x]))}</div>${[...(m.attachments?.values?.() || [])].map(a => `<a href="${a.url}" target="_blank">Anexo: ${a.name || a.url}</a>`).join('<br>')}</article>`).join('')}</html>`; }
