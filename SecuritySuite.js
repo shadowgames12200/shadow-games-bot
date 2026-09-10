@@ -139,7 +139,8 @@ async function handleInteraction(interaction, client) {
   await member.roles.add(role, 'Verificação concluída').catch(() => null);
   if (cfg.quarantineRoleId) await member.roles.remove(cfg.quarantineRoleId, 'Verificação concluída').catch(() => {});
   await log(client, interaction.guild, `✅ ${interaction.user} concluiu a verificação.`, 0x2ecc71);
-  return interaction.reply({ content: '✅ Verificação concluída. Seu acesso foi liberado!', ephemeral: true });
+  await interaction.reply({ content: '✅ Verificação concluída. Seu acesso foi liberado!', ephemeral: true });
+  setTimeout(() => interaction.deleteReply().catch(() => {}), 15_000);
 }
 
 async function install(client) {
