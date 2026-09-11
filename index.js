@@ -1,6 +1,4 @@
 const path = require('path');
-
-
 process.chdir(__dirname);
 const { GatewayIntentBits, Client, Collection } = require('discord.js');
 const { AtivarIntents } = require('./Functions/StartIntents');
@@ -10,7 +8,7 @@ const { install: installProduction } = require('./ProductionSuite');
 const { install: installSecurity } = require('./SecuritySuite');
 const { install: installTicketControl } = require('./TicketControlSuiteEnhanced');
 const { install: installLogs } = require('./LogSuite');
-const { install: installTicketPanel } = require('./TicketPanelSuite');
+const { install: installBotConfigPanels } = require('./BotConfigPanels');
 const { ensure: ensurePayments } = require('./PaymentProviders');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.DirectMessages] });
 const estatisticasNodeInstance = require('./Functions/VariaveisEstatisticas');
@@ -27,10 +25,9 @@ installProfessionalSuite(client);
 installGovernance(client);
 installProduction(client);
 installSecurity(client);
-// TicketControlSuiteEnhanced é o roteador oficial de tickets.
 installTicketControl(client);
-installTicketPanel(client);
 installLogs(client);
+installBotConfigPanels(client);
 ensurePayments();
 const token = process.env.DISCORD_TOKEN || config.token;
 if (!token) throw new Error('Defina DISCORD_TOKEN no ambiente antes de iniciar o bot.');
