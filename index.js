@@ -7,6 +7,7 @@ const { install: installGovernance } = require('./GovernanceSuite');
 const { install: installProduction } = require('./ProductionSuite');
 const { install: installSecurity } = require('./SecuritySuite');
 const { install: installTicketControl } = require('./TicketControlSuiteEnhanced');
+const { install: installLogs } = require('./LogSuite');
 const { ensure: ensurePayments } = require('./PaymentProviders');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.DirectMessages] });
 const estatisticasNodeInstance = require('./Functions/VariaveisEstatisticas');
@@ -26,6 +27,7 @@ installSecurity(client);
 // TicketControlSuiteEnhanced é o único roteador oficial de tickets.
 // Os sistemas antigos não são instalados para evitar listeners duplicados.
 installTicketControl(client);
+installLogs(client);
 ensurePayments();
 const token = process.env.DISCORD_TOKEN || config.token;
 if (!token) throw new Error('Defina DISCORD_TOKEN no ambiente antes de iniciar o bot.');
