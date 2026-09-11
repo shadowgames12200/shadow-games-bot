@@ -1,4 +1,6 @@
 const path = require('path');
+
+
 process.chdir(__dirname);
 const { GatewayIntentBits, Client, Collection } = require('discord.js');
 const { AtivarIntents } = require('./Functions/StartIntents');
@@ -8,6 +10,7 @@ const { install: installProduction } = require('./ProductionSuite');
 const { install: installSecurity } = require('./SecuritySuite');
 const { install: installTicketControl } = require('./TicketControlSuiteEnhanced');
 const { install: installLogs } = require('./LogSuite');
+const { install: installTicketPanel } = require('./TicketPanelSuite');
 const { ensure: ensurePayments } = require('./PaymentProviders');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.DirectMessages] });
 const estatisticasNodeInstance = require('./Functions/VariaveisEstatisticas');
@@ -24,9 +27,9 @@ installProfessionalSuite(client);
 installGovernance(client);
 installProduction(client);
 installSecurity(client);
-// TicketControlSuiteEnhanced é o único roteador oficial de tickets.
-// Os sistemas antigos não são instalados para evitar listeners duplicados.
+// TicketControlSuiteEnhanced é o roteador oficial de tickets.
 installTicketControl(client);
+installTicketPanel(client);
 installLogs(client);
 ensurePayments();
 const token = process.env.DISCORD_TOKEN || config.token;
