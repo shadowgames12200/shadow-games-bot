@@ -5,27 +5,20 @@ const { staffPanel } = require('../../TicketStaffPanel');
 const data = new SlashCommandBuilder()
   .setName('ticket')
   .setDescription('Sistema único de suporte, dúvidas, compras e atendimento')
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild.toString())
-  .addSubcommand(command => command
-    .setName('painel')
-    .setDescription('Publica o painel público de atendimento'))
-  .addSubcommand(command => command
-    .setName('configurar')
-    .setDescription('Abre o painel administrativo de tickets'))
-  .addSubcommand(command => command
-    .setName('staff')
-    .setDescription('Abre as ferramentas da equipe neste ticket'));
+  .addSubcommand(command => command.setName('painel').setDescription('Publica o painel público de atendimento'))
+  .addSubcommand(command => command.setName('configurar').setDescription('Abre o painel administrativo de tickets'))
+  .addSubcommand(command => command.setName('staff').setDescription('Abre as ferramentas da equipe neste ticket'));
 
 module.exports = {
   name: 'ticket',
   data,
   run: async (_client, interaction) => {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-      return interaction.reply({ content: '❌ Você precisa de Gerenciar Servidor para usar este comando.', ephemeral: true });
-    }
     const subcommand = interaction.options?.getSubcommand?.(false);
-    if (subcommand === 'configurar') return interaction.reply(adminPanel());
     if (subcommand === 'staff') return staffPanel(interaction);
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: '❌ Você precisa de Gerenciar Servidor para usar este subcomando.', ephemeral: true });
+    }
+    if (subcommand === 'configurar') return interaction.reply(adminPanel());
     return interaction.reply(panel());
   }
 };
