@@ -253,8 +253,8 @@ async function closeTicket(interaction) {
 }
 async function handlePurchase(interaction) {
   if (interaction.values[0] === 'none') return interaction.reply({ content: 'Não encontramos compras vinculadas a você. Descreva o pedido manualmente no ticket.', ephemeral: true });
-  const found = purchases(interaction).find((p, index) => String(p.id || p.orderId || index + 1) === interaction.values[0]);
-  const summary = found ? `ID: ${found.id || found.orderId || interaction.values[0]} | Produto: ${found.product || found.name || found.item || 'Produto'} | Status: ${found.status || 'não informado'}` : `ID da compra: ${interaction.values[0]}`;
+  const found = purchases(interaction).find((p, index) => String(p.id || p.orderId || p.ref || p.externalReference || p.external_reference || index + 1) === interaction.values[0]);
+  const summary = found ? `ID: ${found.id || found.orderId || found.ref || found.externalReference || interaction.values[0]} | Produto: ${found.product || found.productName || found.name || found.item || found.description || 'Produto'} | Status: ${found.status || 'não informado'}` : `ID da compra: ${interaction.values[0]}`;
   await interaction.channel.send(`📦 **Compra vinculada ao ticket**\n${summary}\nSolicitante: ${interaction.user}`);
   return interaction.reply({ content: '✅ A compra foi vinculada ao ticket e a equipe já pode analisá-la.', ephemeral: true });
 }
