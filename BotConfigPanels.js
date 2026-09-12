@@ -55,8 +55,12 @@ async function ticketModal(i, page) {
 function logEventMenu(i, clear=false) { const opts = Object.entries(LOG_EVENTS).map(([value,label])=>({label,value,description:i.guild ? (ensure(i.guild.id).logs.channels[value] ? 'Configurado' : 'Não configurado') : '',})); return i.reply({ephemeral:true,content:clear?'Escolha o evento cuja configuração deseja remover:':'Escolha o evento:',components:[row(new StringSelectMenuBuilder().setCustomId(clear?'bc_logs_clear_event':'bc_logs_event').setPlaceholder('Selecione um evento').addOptions(opts.slice(0,25)))]}); }
 async function postTicket(i) { const c=ensure(i.guild.id).ticket; if(!c.public.channelId) return i.reply({ephemeral:true,content:'❌ Primeiro configure um canal para o painel público.'}); const ch=i.guild.channels.cache.get(c.public.channelId); if(!ch?.isTextBased()) return i.reply({ephemeral:true,content:'❌ Canal inválido.'}); const teams=db.ticketConfig?.teams||{}; const options=Object.entries(teams).slice(0,25).map(([value,t])=>({label:String(t.name||value).slice(0,100),description:String(t.description||'').slice(0,100),value,emoji:t.emoji||'🎫'})); const e=new EmbedBuilder().setColor(color(c.public.color)).setTitle(c.public.title).setDescription(c.public.description); if(c.public.banner)e.setImage(c.public.banner); if(c.public.logo)e.setThumbnail(c.public.logo); const publicButtons=(c.public.buttons||[]).filter(key=>teams[key]).slice(0,5).map(key=>new ButtonBuilder().setCustomId(`ticket_open_button:${key}`).setLabel(String(teams[key].name||key).slice(0,80)).setEmoji(teams[key].emoji||'🎫').setStyle(ButtonStyle.Primary)); const components=[]; if(publicButtons.length) components.push(row(...publicButtons)); components.push(row(new StringSelectMenuBuilder().setCustomId('ticket_category').setPlaceholder('Selecione uma opção').addOptions(options))); await ch.send({embeds:[e],components}); return i.reply({ephemeral:true,content:`✅ Painel publicado em ${ch}.`}); }
 async function handle(i) {
-  if (!i.guild || !owner(i)) return false;
   const id=i.customId||'';
+  const isTicketConfig = id.startsWith('bc_ticket_') || id.startsWith('bc_logs_');
+  if (!i.guild || (isTicketConfig && !owner(i))) {
+    if (isTicketConfig && !i.replied && !i.deferred) await i.reply({ephemeral:true,content:'❌ Apenas administradores podem usar este painel.'});
+    return false;
+  }
   if (i.isButton?.()) {
     if(id==='bc_ticket_access') return ticketModal(i,'access'); if(id==='bc_ticket_public') return ticketModal(i,'public'); if(id==='bc_ticket_internal') return ticketModal(i,'internal'); if(id==='bc_ticket_purchases') return ticketModal(i,'purchases'); if(id==='bc_ticket_channel') return i.reply({ephemeral:true,content:'Escolha o canal do painel público:',components:[row(new ChannelSelectMenuBuilder().setCustomId('bc_ticket_channel_select').setPlaceholder('Selecione um canal').setChannelTypes(ChannelType.GuildText))]}); if(id==='bc_ticket_post') return postTicket(i); if(id==='bc_ticket_sync') return ticketHome(i); if(id==='bc_logs_select') return logEventMenu(i); if(id==='bc_logs_clear') return logEventMenu(i,true); if(id==='bc_logs_refresh') return logsHome(i);
   }
@@ -68,7 +72,7 @@ async function handle(i) {
 }
 function install(client) {
   client.on('interactionCreate', async interaction => {
-    try { await handle(interaction); } catch (error) { console.error('[BotConfigPanels]', error); }
+    try { await handle(interaction); } catch (error) { console.error('[BotConfigPanels]', error); if (interaction.isRepliable?.() && !interaction.replied && !interaction.deferred) await interaction.reply({ephemeral:true,content:'❌ Ocorreu um erro ao processar esta opção. Tente novamente.'}).catch(()=>{}); }
   });
 }
 
