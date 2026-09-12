@@ -63,15 +63,13 @@ async function ticketModal(i, page) {
 function logEventMenu(i, clear=false) { const opts = Object.entries(LOG_EVENTS).map(([value,label])=>({label,value,description:i.guild ? (ensure(i.guild.id).logs.channels[value] ? 'Configurado' : 'Não configurado') : '',})); return i.reply({ephemeral:true,content:clear?'Escolha o evento cuja configuração deseja remover:':'Escolha o evento:',components:[row(new StringSelectMenuBuilder().setCustomId(clear?'bc_logs_clear_event':'bc_logs_event').setPlaceholder('Selecione um evento').addOptions(opts.slice(0,25)))]}); }
 function ticketPublicPayload(guild, c) {
   const teams = db.ticketConfig?.teams || {};
-  const options = Object.entries(teams).slice(0, 25).map(([value, t]) => ({ label: String(t.name || value).slice(0, 100), description: String(t.description || '').slice(0, 100), value, emoji: t.emoji || '🎫' }));
+  const selected = (c.public.buttons || []).filter(key => teams[key]);
+  const source = selected.length ? selected.map(key => [key, teams[key]]) : Object.entries(teams);
+  const options = source.slice(0, 25).map(([value, t]) => ({ label: String(t.name || value).slice(0, 100), description: String(t.description || '').slice(0, 100), value, emoji: t.emoji || '🎫' }));
   const e = new EmbedBuilder().setColor(color(c.public.color)).setTitle(c.public.title).setDescription(c.public.description).setFooter({ text: `ticket-panel:${guild.id}` });
   if (c.public.banner) e.setImage(c.public.banner);
   if (c.public.logo) e.setThumbnail(c.public.logo);
-  const publicButtons = (c.public.buttons || []).filter(key => teams[key]).slice(0, 25).map(key => new ButtonBuilder().setCustomId(`ticket_open_button:${key}`).setLabel(String(teams[key].name || key).slice(0, 80)).setEmoji(teams[key].emoji || '🎫').setStyle(ButtonStyle.Primary));
-  const components = [];
-  if (publicButtons.length) { for (let n = 0; n < publicButtons.length; n += 5) components.push(row(...publicButtons.slice(n, n + 5))); }
-  else components.push(row(new StringSelectMenuBuilder().setCustomId('ticket_category').setPlaceholder('Selecione uma opção').addOptions(options)));
-  return { embeds: [e], components };
+  return { embeds: [e], components: [row(new StringSelectMenuBuilder().setCustomId('ticket_category').setPlaceholder('Selecione uma opção').addOptions(options))] };
 }
 function isTicketPanelMessage(message, client) {
   if (!message?.author || message.author.id !== client.user?.id) return false;
