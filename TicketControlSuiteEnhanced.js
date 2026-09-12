@@ -58,19 +58,30 @@ function ticketButtons(guildId) {
     close: () => new ButtonBuilder().setCustomId('ticket_close').setLabel('Deletar e Salvar').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
   };
   const buttons = configured.filter(key => defs[key]).map(key => defs[key]());
-  return new ActionRowBuilder().addComponents(...(buttons.length ? buttons : [defs.notify(), defs.claim(), defs.close()]));
+  return buttons.length ? new ActionRowBuilder().addComponents(...buttons) : null;
 }
-function optionMenu() {
-  return new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_options').setPlaceholder('Selecione um painel de opções').addOptions(
-    { label: 'Painel Staff', description: 'Ferramentas para a equipe', value: 'staff', emoji: '🛠️' },
+function clientOptionMenu() {
+  return new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_client_options').setPlaceholder('Opções do cliente').addOptions(
     { label: 'Opções Clientes', description: 'Opções disponíveis para você', value: 'client', emoji: '👤' },
-    { label: 'Informar pedido', description: 'Vincular uma compra a este ticket', value: 'purchase', emoji: '📦' },
+    { label: 'Informar pedido', description: 'Vincular uma compra a este ticket', value: 'purchase', emoji: '📦' }
+  ));
+}
+function staffPanel(interaction) {
+  const info = topicInfo(interaction.channel);
+  if (!info.userId) return interaction.reply({ content: '❌ Use este comando dentro de um canal de ticket.', ephemeral: true });
+  const team = teamFor(info.team);
+  if (!isStaff(interaction, team)) return interaction.reply({ content: '❌ Apenas a equipe pode abrir as ferramentas do ticket.', ephemeral: true });
+  const controls = ticketButtons(interaction.guild.id);
+  const components = [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_staff_options').setPlaceholder('Mais ferramentas').addOptions(
     { label: 'Transferir atendimento', description: 'Mover para outro setor ou atendente', value: 'transfer', emoji: '🔁' },
     { label: 'Alterar status', description: 'Atualizar o andamento do atendimento', value: 'status', emoji: '📌' },
     { label: 'Definir prioridade', description: 'Marcar urgência do ticket', value: 'priority', emoji: '🚦' },
     { label: 'Respostas rápidas', description: 'Enviar uma mensagem pronta', value: 'quick', emoji: '⚡' }
-  ));
+  ))];
+  if (controls) components.unshift(controls);
+  return interaction.reply({ content: '🛠️ Ferramentas da equipe', components, ephemeral: true });
 }
+
 function purchases(interaction) {
   const uid = String(interaction.user.id);
   const stores = [db.purchases, db.purchaseHistory, db.orders, db.sales, Object.values(db.payment?.charges || {})].filter(Boolean);
@@ -113,7 +124,7 @@ async function createTicket(interaction, key, form = null) {
   const formText = form ? `\n\n**Nome:** ${form.name}\n**Pedido/compra:** ${form.order}\n**Descrição:** ${form.problem}` : '';
   const embed = new EmbedBuilder().setColor(PURPLE).setTitle(`🎫 ${team.name}`).setDescription(`Olá ${interaction.user}, seu ticket foi criado!\n\nNossa equipe irá atendê-lo em breve.\n\n**Categoria:** ${team.name}\n**Solicitante:** ${interaction.user.tag}${formText}`);
   const teamMentions = roleIdsFor(team).map(roleId => `<@&${roleId}>`).join(' ');
-  await channel.send({ content: `${interaction.user}${teamMentions ? ` ${teamMentions}` : ''}`, embeds: [embed], components: [ticketButtons(guild.id), optionMenu()] });
+  await channel.send({ content: `${interaction.user}${teamMentions ? ` ${teamMentions}` : ''}`, embeds: [embed], components: [clientOptionMenu()] });
   const purchaseMessage = purchasePanel(interaction);
   if (purchaseMessage) await channel.send(purchaseMessage);
   db.ticketStats.opened = (db.ticketStats.opened || 0) + 1; save();
@@ -142,12 +153,12 @@ function quickReplyMenu() {
   return { components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_quick').setPlaceholder('Escolha uma resposta pronta').addOptions(Object.keys(QUICK_REPLIES).map(value => ({ value, label: value[0].toUpperCase()+value.slice(1), description: QUICK_REPLIES[value].slice(0,100), emoji:'⚡' }))))] };
 }
 function openTicketModal(key) {
-  return new ModalBuilder().setCustomId(`ticket_open_${key}`).setTitle(`Abrir ${teamFor(key).name}`).addComponents(
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ticket_open_name').setLabel('Seu nome ou apelido').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ticket_open_order').setLabel('ID do pedido ou produto (opcional)').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ticket_open_problem').setLabel('Explique como podemos ajudar').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000))
-  );
+  const fields = [new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ticket_open_name').setLabel('Seu nome ou apelido').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80))];
+  if (key === 'suporte') fields.push(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ticket_open_order').setLabel('ID ou nome do produto (opcional)').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100)));
+  fields.push(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ticket_open_problem').setLabel(key === 'duvidas' ? 'Qual é a sua dúvida?' : 'Explique como podemos ajudar').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)));
+  return new ModalBuilder().setCustomId(`ticket_open_${key}`).setTitle(`Abrir ${teamFor(key).name}`).addComponents(fields);
 }
+
 function transferModal() {
   return new ModalBuilder().setCustomId('ticket_transfer').setTitle('Transferir atendimento').addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ticket_transfer_team').setLabel('Setor: suporte, duvidas, financeiro ou parceria').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30)),
@@ -193,7 +204,7 @@ async function handleQuickReply(interaction) {
 }
 async function handleOpenModal(interaction) {
   const key = interaction.customId.replace('ticket_open_', '');
-  const form = { name: interaction.fields.getTextInputValue('ticket_open_name'), order: interaction.fields.getTextInputValue('ticket_open_order') || 'Não informado', problem: interaction.fields.getTextInputValue('ticket_open_problem') };
+  const form = { name: interaction.fields.getTextInputValue('ticket_open_name'), order: interaction.fields.fields.has('ticket_open_order') ? interaction.fields.getTextInputValue('ticket_open_order') : 'Não se aplica', problem: interaction.fields.getTextInputValue('ticket_open_problem') };
   return createTicket(interaction, key, form);
 }
 
@@ -242,8 +253,14 @@ async function closeTicket(interaction) {
   const info = topicInfo(interaction.channel), team = teamFor(info.team);
   if (!isStaff(interaction, team)) return interaction.reply({ content: '❌ Somente a equipe pode fechar este ticket.', ephemeral: true });
   await interaction.deferReply({ ephemeral: true });
-  const content = await transcript(interaction.channel), log = db.ticketConfig.logsChannelId ? await interaction.guild.channels.fetch(db.ticketConfig.logsChannelId).catch(() => null) : null;
-  if (log?.isTextBased()) await log.send({ content: `📁 Ticket fechado: **${interaction.channel.name}** por ${interaction.user}\nSolicitante: <@${info.userId}>`, files: [new AttachmentBuilder(Buffer.from(content || 'Sem mensagens.'), { name: `${interaction.channel.name}.txt` })] });
+  const content = await transcript(interaction.channel), logId = transcriptChannelId(interaction.guild.id), log = logId ? await interaction.guild.channels.fetch(logId).catch(() => null) : null;
+  if (!log?.isTextBased()) return interaction.editReply({ content: '❌ Não foi possível fechar: configure um canal de transcript válido no /botconfig ticket.' });
+  try {
+    await log.send({ content: `📁 Transcript obrigatório: **${interaction.channel.name}** por ${interaction.user}\nSolicitante: <@${info.userId}>`, files: [new AttachmentBuilder(Buffer.from(content || 'Sem mensagens.'), { name: `${interaction.channel.name}.txt` })] });
+  } catch (error) {
+    console.error('[TicketControlSuite] transcript before close failed', error);
+    return interaction.editReply({ content: '❌ Não foi possível salvar o transcript. O ticket não foi excluído.' });
+  }
   if (slaTimers.has(interaction.channel.id)) { clearTimeout(slaTimers.get(interaction.channel.id)); slaTimers.delete(interaction.channel.id); }
   db.ticketStats ||= { opened: 0, closed: 0, ratings: [] }; db.ticketStats.closed = (db.ticketStats.closed || 0) + 1; save();
   const requester = await interaction.guild.members.fetch(info.userId).catch(() => null);
@@ -300,6 +317,9 @@ async function rateTicket(interaction) {
 
 async function install(client) {
   ensure();
+  client.once(Events.ClientReady, async ready => {
+    await ready.application.commands.create({ name: 'ticket-staff', description: 'Abrir ferramentas privadas da equipe neste ticket' }).catch(error => console.error('[TicketControlSuite] command registration failed', error));
+  });
   client.on(Events.InteractionCreate, async interaction => {
     try {
       if (interaction.isButton() && interaction.customId.startsWith('ticket_open_button:')) return interaction.showModal(openTicketModal(interaction.customId.split(':')[1]));
@@ -317,12 +337,16 @@ async function install(client) {
       if (interaction.isButton() && interaction.customId === 'ticket_claim') return claimTicket(interaction);
       if (interaction.isButton() && interaction.customId === 'ticket_transcript') return saveTranscript(interaction);
       if (interaction.isButton() && interaction.customId === 'ticket_close') return closeTicket(interaction);
-      if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_options') {
+      if (interaction.isChatInputCommand() && interaction.commandName === 'ticket-staff') return staffPanel(interaction);
+      if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_staff_options') {
         if (interaction.values[0] === 'transfer') return interaction.showModal(transferModal());
         if (interaction.values[0] === 'status') return interaction.reply({ ...operationMenu('status'), ephemeral: true });
         if (interaction.values[0] === 'priority') return interaction.reply({ ...operationMenu('priority'), ephemeral: true });
         if (interaction.values[0] === 'quick') return interaction.reply({ ...quickReplyMenu(), ephemeral: true });
-        return interaction.reply({ content: interaction.values[0] === 'purchase' ? 'Use o menu de compras enviado neste ticket para vincular um pedido.' : interaction.values[0] === 'staff' ? '🛠️ Ferramentas Staff: assumir, notificar e salvar o ticket.' : '👤 Você pode enviar mensagens, anexos e informações do pedido neste ticket.', ephemeral: true });
+        return interaction.reply({ content: '✅ Ferramenta aberta.', ephemeral: true });
+      }
+      if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_client_options') {
+        return interaction.reply({ content: interaction.values[0] === 'purchase' ? 'Use o menu de compras enviado neste ticket para vincular um pedido.' : '👤 Você pode enviar mensagens, anexos e informações do pedido neste ticket.', ephemeral: true });
       }
     } catch (error) {
       console.error('[TicketControlSuite]', error);
