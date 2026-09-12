@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { panel, adminPanel, staffPanel } = require('../../TicketControlSuiteEnhanced');
+const { panel, adminPanel } = require('../../TicketControlSuiteEnhanced');
+const { staffPanel } = require('../../TicketStaffPanel');
 
 const data = new SlashCommandBuilder()
   .setName('ticket')
