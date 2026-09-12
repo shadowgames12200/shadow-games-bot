@@ -23,6 +23,8 @@ function ensure() {
     panelColor: PURPLE, panelImage: '', logsChannelId: '', claimRole: '', closeRole: '', ...db.ticketConfig
   });
   db.ticketConfig.permissions ||= {};
+  db.ticketConfig.assumeRoleIds ||= [];
+  if (!Array.isArray(db.ticketConfig.assumeRoleIds)) db.ticketConfig.assumeRoleIds = String(db.ticketConfig.assumeRoleIds || '').split(',').map(x => x.trim()).filter(Boolean);
   db.ticketConfig.teams = { ...DEFAULT_TEAMS, ...(db.ticketConfig.teams || {}) };
   for (const [key, team] of Object.entries(db.ticketConfig.teams)) db.ticketConfig.teams[key] = { ...DEFAULT_TEAMS[key], ...team };
   save();
@@ -31,7 +33,11 @@ function ensure() {
 const slug = value => String(value || 'usuario').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').slice(0, 24).replace(/^-|-$/g, '') || 'usuario';
 const topicInfo = channel => { const p = String(channel?.topic || '').split(':'); return p[0] === 'ticket' ? { userId: p[1], team: p[2], claimedBy: p[3] || '', status: p[4] || 'aberto', priority: p[5] || 'normal' } : {}; };
 const topicFor = info => `ticket:${info.userId}:${info.team}:${info.claimedBy || ''}:${info.status || 'aberto'}:${info.priority || 'normal'}`;
-const isStaff = (interaction, team = {}) => Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) || interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels) || [team.roleId, db.ticketConfig.claimRole, db.ticketConfig.closeRole, db.ticketConfig.permissions?.claimRole, db.ticketConfig.permissions?.closeRole].filter(Boolean).some(id => interaction.member?.roles?.cache?.has(id)));
+const roleIdsFor = team => [...new Set([team.roleId, ...(team.roleIds || []), ...(db.ticketConfig.assumeRoleIds || [])].filter(Boolean))];
+const configuredTicket = guildId => db.botConfig?.[guildId]?.ticket || {};
+const transcriptChannelId = guildId => configuredTicket(guildId).transcriptChannelId || db.ticketConfig.logsChannelId || '';
+function jumpButton(guild, channel) { return new ButtonBuilder().setLabel('Ir para ticket').setEmoji('🎫').setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/${guild.id}/${channel.id}`); }
+const isStaff = (interaction, team = {}) => Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) || interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels) || [...roleIdsFor(team), db.ticketConfig.claimRole, db.ticketConfig.closeRole, db.ticketConfig.permissions?.claimRole, db.ticketConfig.permissions?.closeRole].filter(Boolean).some(id => interaction.member?.roles?.cache?.has(id)));
 const teamFor = key => db.ticketConfig.teams[key] || db.ticketConfig.teams.suporte;
 
 function categoryMenu() {
@@ -43,12 +49,16 @@ function panel() {
   if (c.panelImage) embed.setImage(c.panelImage);
   return { embeds: [embed], components: [categoryMenu()] };
 }
-function ticketButtons() {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('ticket_notify').setLabel('Notificar equipe').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('ticket_claim').setLabel('Assumir Ticket').setEmoji('🔒').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('ticket_close').setLabel('Deletar e Salvar').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
-  );
+function ticketButtons(guildId) {
+  const configured = configuredTicket(guildId).internal?.buttons || ['notify','claim','transcript','close'];
+  const defs = {
+    notify: () => new ButtonBuilder().setCustomId('ticket_notify').setLabel('Notificar equipe').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
+    claim: () => new ButtonBuilder().setCustomId('ticket_claim').setLabel('Assumir Ticket').setEmoji('🔒').setStyle(ButtonStyle.Primary),
+    transcript: () => new ButtonBuilder().setCustomId('ticket_transcript').setLabel('Salvar transcript').setEmoji('📄').setStyle(ButtonStyle.Secondary),
+    close: () => new ButtonBuilder().setCustomId('ticket_close').setLabel('Deletar e Salvar').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
+  };
+  const buttons = configured.filter(key => defs[key]).map(key => defs[key]());
+  return new ActionRowBuilder().addComponents(...(buttons.length ? buttons : [defs.notify(), defs.claim(), defs.close()]));
 }
 function optionMenu() {
   return new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_options').setPlaceholder('Selecione um painel de opções').addOptions(
@@ -62,14 +72,27 @@ function optionMenu() {
   ));
 }
 function purchases(interaction) {
-  const source = db.purchases || db.purchaseHistory || db.orders || {};
-  const list = Array.isArray(source) ? source.filter(p => String(p.userId || p.user || p.discordId || p.customerId) === String(interaction.user.id)) : source[interaction.user.id] || [];
-  return Array.isArray(list) ? list.slice(-25) : [];
+  const uid = String(interaction.user.id);
+  const stores = [db.purchases, db.purchaseHistory, db.orders, db.sales, Object.values(db.payment?.charges || {})].filter(Boolean);
+  const matches = [];
+  const seen = new Set();
+  const scan = value => {
+    if (!value || typeof value !== 'object' || seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) return value.forEach(scan);
+    const owner = String(value.userId || value.user || value.discordId || value.discordID || value.customerId || value.ownerId || value.discord_user_id || '');
+    if (owner === uid && (value.product || value.productName || value.name || value.item || value.ref || value.externalReference || value.external_reference)) matches.push(value);
+    Object.values(value).forEach(scan);
+  };
+  stores.forEach(scan);
+  return matches.slice(-25);
 }
 function purchasePanel(interaction) {
+  const settings = configuredTicket(interaction.guild.id).purchases || {};
+  if (settings.enabled === false) return null;
   const list = purchases(interaction);
-  const options = list.map((p, index) => ({ label: `ID: ${p.id || p.orderId || index + 1} - ${String(p.product || p.name || p.item || 'Produto').slice(0, 75)}`, value: String(p.id || p.orderId || index + 1) }));
-  return { embeds: [new EmbedBuilder().setColor(PURPLE).setTitle('Compras encontradas').setDescription('Caso o ticket seja referente a um pedido já efetuado, selecione a compra abaixo.')], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_purchase').setPlaceholder('Selecione uma das últimas compras').addOptions(options.length ? options : [{ label: 'Nenhuma compra encontrada', value: 'none', emoji: '📦' }]))] };
+  const options = list.map((p, index) => ({ label: `ID: ${p.id || p.orderId || p.ref || index + 1} - ${String(p.product || p.productName || p.name || p.item || p.externalReference || 'Produto').slice(0, 75)}`, value: String(p.id || p.orderId || p.ref || index + 1) }));
+  return { embeds: [new EmbedBuilder().setColor(PURPLE).setTitle(settings.title || 'Compras encontradas').setDescription(settings.description || 'Caso o ticket seja referente a um pedido já efetuado, selecione a compra abaixo.')], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_purchase').setPlaceholder('Selecione uma das últimas compras').addOptions(options.length ? options : [{ label: 'Nenhuma compra encontrada', value: 'none', emoji: '📦' }]))] };
 }
 async function createTicket(interaction, key, form = null) {
   const team = teamFor(key), guild = interaction.guild;
@@ -85,15 +108,17 @@ async function createTicket(interaction, key, form = null) {
     { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles] },
     { id: guild.members.me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages] }
   ];
-  if (team.roleId) permissions.push({ id: team.roleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
+  for (const roleId of roleIdsFor(team)) permissions.push({ id: roleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
   const channel = await guild.channels.create({ name: `${slug(team.name)}-${slug(interaction.user.username)}-${String(interaction.user.id).slice(-4)}`, type: ChannelType.GuildText, parent: team.categoryId || undefined, topic: topicFor({ userId: interaction.user.id, team: key, status: 'aberto', priority: 'normal' }), permissionOverwrites: permissions });
   const formText = form ? `\n\n**Nome:** ${form.name}\n**Pedido/compra:** ${form.order}\n**Descrição:** ${form.problem}` : '';
   const embed = new EmbedBuilder().setColor(PURPLE).setTitle(`🎫 ${team.name}`).setDescription(`Olá ${interaction.user}, seu ticket foi criado!\n\nNossa equipe irá atendê-lo em breve.\n\n**Categoria:** ${team.name}\n**Solicitante:** ${interaction.user.tag}${formText}`);
-  await channel.send({ content: `${interaction.user}${team.roleId ? ` <@&${team.roleId}>` : ''}`, embeds: [embed], components: [ticketButtons(), optionMenu()] });
-  if (key === 'suporte' || key === 'financeiro') await channel.send(purchasePanel(interaction));
+  const teamMentions = roleIdsFor(team).map(roleId => `<@&${roleId}>`).join(' ');
+  await channel.send({ content: `${interaction.user}${teamMentions ? ` ${teamMentions}` : ''}`, embeds: [embed], components: [ticketButtons(guild.id), optionMenu()] });
+  const purchaseMessage = purchasePanel(interaction);
+  if (purchaseMessage) await channel.send(purchaseMessage);
   db.ticketStats.opened = (db.ticketStats.opened || 0) + 1; save();
   scheduleSla(channel);
-  return interaction.reply({ content: `✅ Seu ticket foi criado: ${channel}`, ephemeral: true });
+  return interaction.reply({ content: `✅ Seu ticket foi criado: ${channel}`, components: [new ActionRowBuilder().addComponents(jumpButton(guild, channel))], ephemeral: true });
 }
 function scheduleSla(channel) {
   if (slaTimers.has(channel.id)) clearTimeout(slaTimers.get(channel.id));
@@ -182,8 +207,9 @@ async function claimTicket(interaction) {
   const info = topicInfo(interaction.channel), team = teamFor(info.team);
   if (!isStaff(interaction, team)) return interaction.reply({ content: '❌ Você não pode assumir este ticket.', ephemeral: true });
   if (info.claimedBy && info.claimedBy !== interaction.user.id) return interaction.reply({ content: `❌ Este ticket já foi assumido por <@${info.claimedBy}>.`, ephemeral: true });
-  await interaction.channel.setTopic(`ticket:${info.userId}:${info.team}:${interaction.user.id}`);
-  if (team.roleId) await interaction.channel.permissionOverwrites.edit(team.roleId, { SendMessages: false }).catch(() => {});
+  await interaction.channel.setTopic(topicFor({ ...info, claimedBy: interaction.user.id }));
+  for (const roleId of roleIdsFor(team)) await interaction.channel.permissionOverwrites.edit(roleId, { ViewChannel: false, SendMessages: false }).catch(() => {});
+  await interaction.channel.permissionOverwrites.edit(interaction.user.id, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }).catch(() => {});
   return interaction.reply({ content: `🔒 Ticket assumido por ${interaction.user}. Os demais atendentes não poderão assumir este ticket.` });
 }
 async function transcript(channel) {
@@ -201,6 +227,16 @@ async function transcript(channel) {
     const embeds = message.embeds.length ? ` [${message.embeds.map(embed => embed.title || embed.description || 'embed').join(' | ')}]` : '';
     return `[${message.createdAt.toISOString()}] ${message.author.tag}: ${message.content || ''}${embeds}${attachments ? ` Anexos: ${attachments}` : ''}`;
   }).join('\n');
+}
+async function saveTranscript(interaction, close = false) {
+  const info = topicInfo(interaction.channel), team = teamFor(info.team);
+  if (!isStaff(interaction, team)) return interaction.reply({ content: '❌ Apenas a equipe pode salvar o transcript.', ephemeral: true });
+  const logId = transcriptChannelId(interaction.guild.id);
+  const log = logId ? await interaction.guild.channels.fetch(logId).catch(() => null) : null;
+  if (!log?.isTextBased()) return interaction.reply({ content: '❌ Configure um canal de transcript no painel de configuração.', ephemeral: true });
+  const content = await transcript(interaction.channel);
+  await log.send({ content: `📄 Transcript: **${interaction.channel.name}** salvo por ${interaction.user}\nSolicitante: <@${info.userId}>`, files: [new AttachmentBuilder(Buffer.from(content || 'Sem mensagens.'), { name: `${interaction.channel.name}.txt` })] });
+  return interaction.reply({ content: '✅ Transcript salvo no canal configurado.', ephemeral: true });
 }
 async function closeTicket(interaction) {
   const info = topicInfo(interaction.channel), team = teamFor(info.team);
@@ -266,6 +302,7 @@ async function install(client) {
   ensure();
   client.on(Events.InteractionCreate, async interaction => {
     try {
+      if (interaction.isButton() && interaction.customId.startsWith('ticket_open_button:')) return interaction.showModal(openTicketModal(interaction.customId.split(':')[1]));
       if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category') return interaction.showModal(openTicketModal(interaction.values[0]));
       if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_purchase') return handlePurchase(interaction);
       if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_status') return handleTicketStatus(interaction);
@@ -278,6 +315,7 @@ async function install(client) {
       if (interaction.isButton() && interaction.customId.startsWith('ticket_rate_')) return rateTicket(interaction);
       if (interaction.isButton() && interaction.customId === 'ticket_notify') return notifyTeam(interaction);
       if (interaction.isButton() && interaction.customId === 'ticket_claim') return claimTicket(interaction);
+      if (interaction.isButton() && interaction.customId === 'ticket_transcript') return saveTranscript(interaction);
       if (interaction.isButton() && interaction.customId === 'ticket_close') return closeTicket(interaction);
       if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_options') {
         if (interaction.values[0] === 'transfer') return interaction.showModal(transferModal());
@@ -290,6 +328,13 @@ async function install(client) {
       console.error('[TicketControlSuite]', error);
       if (!interaction.replied && !interaction.deferred) interaction.reply({ content: '❌ Não foi possível concluir essa ação. Verifique as permissões do bot.', ephemeral: true }).catch(() => {});
     }
+  });
+  client.on('messageCreate', async message => {
+    if (!message.guild || message.author.bot || !message.channel?.topic?.startsWith('ticket:')) return;
+    const info = topicInfo(message.channel);
+    if (!info.claimedBy || info.claimedBy !== message.author.id) return;
+    const targets = new Set([...message.mentions.users.keys(), ...message.mentions.roles.keys()]);
+    for (const id of targets) await message.channel.permissionOverwrites.edit(id, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }).catch(() => {});
   });
 }
 module.exports = { install, panel, adminPanel, ensure };
