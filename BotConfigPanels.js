@@ -53,7 +53,45 @@ async function ticketModal(i, page) {
   return i.showModal(modal('bc_ticket_purchase_save','Painel de compras',[{id:'title',label:'Título',value:c.purchases.title},{id:'description',label:'Descrição',value:c.purchases.description,long:true},{id:'enabled',label:'Ativado? sim ou não',value:c.purchases.enabled?'sim':'não'}]));
 }
 function logEventMenu(i, clear=false) { const opts = Object.entries(LOG_EVENTS).map(([value,label])=>({label,value,description:i.guild ? (ensure(i.guild.id).logs.channels[value] ? 'Configurado' : 'Não configurado') : '',})); return i.reply({ephemeral:true,content:clear?'Escolha o evento cuja configuração deseja remover:':'Escolha o evento:',components:[row(new StringSelectMenuBuilder().setCustomId(clear?'bc_logs_clear_event':'bc_logs_event').setPlaceholder('Selecione um evento').addOptions(opts.slice(0,25)))]}); }
-async function postTicket(i) { const c=ensure(i.guild.id).ticket; if(!c.public.channelId) return i.reply({ephemeral:true,content:'❌ Primeiro configure um canal para o painel público.'}); const ch=i.guild.channels.cache.get(c.public.channelId); if(!ch?.isTextBased()) return i.reply({ephemeral:true,content:'❌ Canal inválido.'}); const teams=db.ticketConfig?.teams||{}; const options=Object.entries(teams).slice(0,25).map(([value,t])=>({label:String(t.name||value).slice(0,100),description:String(t.description||'').slice(0,100),value,emoji:t.emoji||'🎫'})); const e=new EmbedBuilder().setColor(color(c.public.color)).setTitle(c.public.title).setDescription(c.public.description); if(c.public.banner)e.setImage(c.public.banner); if(c.public.logo)e.setThumbnail(c.public.logo); const publicButtons=(c.public.buttons||[]).filter(key=>teams[key]).slice(0,5).map(key=>new ButtonBuilder().setCustomId(`ticket_open_button:${key}`).setLabel(String(teams[key].name||key).slice(0,80)).setEmoji(teams[key].emoji||'🎫').setStyle(ButtonStyle.Primary)); const components=[]; if(publicButtons.length) components.push(row(...publicButtons)); else components.push(row(new StringSelectMenuBuilder().setCustomId('ticket_category').setPlaceholder('Selecione uma opção').addOptions(options))); await ch.send({embeds:[e],components}); return i.reply({ephemeral:true,content:`✅ Painel publicado em ${ch}.`}); }
+function ticketPublicPayload(guild, c) {
+  const teams = db.ticketConfig?.teams || {};
+  const options = Object.entries(teams).slice(0, 25).map(([value, t]) => ({ label: String(t.name || value).slice(0, 100), description: String(t.description || '').slice(0, 100), value, emoji: t.emoji || '🎫' }));
+  const e = new EmbedBuilder().setColor(color(c.public.color)).setTitle(c.public.title).setDescription(c.public.description).setFooter({ text: `ticket-panel:${guild.id}` });
+  if (c.public.banner) e.setImage(c.public.banner);
+  if (c.public.logo) e.setThumbnail(c.public.logo);
+  const publicButtons = (c.public.buttons || []).filter(key => teams[key]).slice(0, 25).map(key => new ButtonBuilder().setCustomId(`ticket_open_button:${key}`).setLabel(String(teams[key].name || key).slice(0, 80)).setEmoji(teams[key].emoji || '🎫').setStyle(ButtonStyle.Primary));
+  const components = [];
+  if (publicButtons.length) { for (let n = 0; n < publicButtons.length; n += 5) components.push(row(...publicButtons.slice(n, n + 5))); }
+  else components.push(row(new StringSelectMenuBuilder().setCustomId('ticket_category').setPlaceholder('Selecione uma opção').addOptions(options)));
+  return { embeds: [e], components };
+}
+function isTicketPanelMessage(message, client) {
+  if (!message?.author || message.author.id !== client.user?.id) return false;
+  return (message.components || []).some(component => (component.components || []).some(item => item.customId === 'ticket_category' || String(item.customId || '').startsWith('ticket_open_button:')));
+}
+async function postTicket(i) {
+  const c = ensure(i.guild.id).ticket;
+  if (!c.public.channelId) return i.reply({ ephemeral: true, content: '❌ Primeiro configure um canal para o painel público.' });
+  const ch = i.guild.channels.cache.get(c.public.channelId);
+  if (!ch?.isTextBased()) return i.reply({ ephemeral: true, content: '❌ Canal inválido.' });
+  await ch.send(ticketPublicPayload(i.guild, c));
+  return i.reply({ ephemeral: true, content: `✅ Painel publicado em ${ch}.` });
+}
+async function syncTicketPanels(i) {
+  const c = ensure(i.guild.id).ticket;
+  const payload = ticketPublicPayload(i.guild, c);
+  let updated = 0;
+  for (const channel of i.guild.channels.cache.values()) {
+    if (!channel.isTextBased?.() || !channel.viewable) continue;
+    const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+    if (!messages) continue;
+    for (const message of messages.values()) {
+      if (!isTicketPanelMessage(message, i.client)) continue;
+      await message.edit(payload).then(() => { updated += 1; }).catch(() => {});
+    }
+  }
+  return i.reply({ ephemeral: true, content: updated ? `✅ ${updated} painel(is) público(s) de ticket sincronizado(s). O sistema de vendas não foi alterado.` : 'ℹ️ Nenhum painel público de ticket encontrado nas últimas 100 mensagens de cada canal.' });
+}
 async function handle(i) {
   const id=i.customId||'';
   const isTicketConfig = id.startsWith('bc_ticket_') || id.startsWith('bc_logs_');
@@ -62,7 +100,7 @@ async function handle(i) {
     return false;
   }
   if (i.isButton?.()) {
-    if(id==='bc_ticket_access') return ticketModal(i,'access'); if(id==='bc_ticket_public') return ticketModal(i,'public'); if(id==='bc_ticket_internal') return ticketModal(i,'internal'); if(id==='bc_ticket_purchases') return ticketModal(i,'purchases'); if(id==='bc_ticket_channel') return i.reply({ephemeral:true,content:'Escolha o canal do painel público:',components:[row(new ChannelSelectMenuBuilder().setCustomId('bc_ticket_channel_select').setPlaceholder('Selecione um canal').setChannelTypes(ChannelType.GuildText))]}); if(id==='bc_ticket_post') return postTicket(i); if(id==='bc_ticket_sync') return ticketHome(i); if(id==='bc_logs_select') return logEventMenu(i); if(id==='bc_logs_clear') return logEventMenu(i,true); if(id==='bc_logs_refresh') return logsHome(i);
+    if(id==='bc_ticket_access') return ticketModal(i,'access'); if(id==='bc_ticket_public') return ticketModal(i,'public'); if(id==='bc_ticket_internal') return ticketModal(i,'internal'); if(id==='bc_ticket_purchases') return ticketModal(i,'purchases'); if(id==='bc_ticket_channel') return i.reply({ephemeral:true,content:'Escolha o canal do painel público:',components:[row(new ChannelSelectMenuBuilder().setCustomId('bc_ticket_channel_select').setPlaceholder('Selecione um canal').setChannelTypes(ChannelType.GuildText))]}); if(id==='bc_ticket_post') return postTicket(i); if(id==='bc_ticket_sync') return syncTicketPanels(i); if(id==='bc_logs_select') return logEventMenu(i); if(id==='bc_logs_clear') return logEventMenu(i,true); if(id==='bc_logs_refresh') return logsHome(i);
   }
   if(i.isStringSelectMenu?.() && (id==='bc_logs_event'||id==='bc_logs_clear_event')) { const key=i.values[0]; if(id==='bc_logs_clear_event'){delete ensure(i.guild.id).logs.channels[key];save();return logsHome(i);} return i.reply({ephemeral:true,content:`Escolha o canal para **${LOG_EVENTS[key]}**:`,components:[row(new ChannelSelectMenuBuilder().setCustomId(`bc_logs_channel:${key}`).setPlaceholder('Selecione um canal').setChannelTypes(ChannelType.GuildText))]}); }
   if(i.isChannelSelectMenu?.() && id==='bc_ticket_channel_select') { ensure(i.guild.id).ticket.public.channelId=i.values[0]; save(); return ticketHome(i); }
