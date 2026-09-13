@@ -208,16 +208,33 @@ async function handleRating(interaction) {
 }
 
 async function buildTranscript(thread) {
-  const messages = await thread.messages.fetch({ limit: 100 });
-  const rows = [...messages.values()].reverse().map(message => {
-    const content = escapeHtml(message.cleanContent || '[anexo, imagem ou componente]');
-    const attachments = [...(message.attachments?.values?.() || [])].map(file => `<p><a href="${escapeHtml(file.url)}">📎 ${escapeHtml(file.name || 'Anexo')}</a></p>`).join('');
-    return `<article><div class="meta">${escapeHtml(message.author?.tag || 'Usuário')} · ${new Date(message.createdTimestamp).toLocaleString('pt-BR')}</div><div class="content">${content.replace(/\n/g, '<br>')}${attachments}</div></article>`;
+  const messages = [...(await thread.messages.fetch({ limit: 100 })).values()].reverse();
+  const profile = storeProfile();
+  const guildName = thread.guild?.name || profile.name || 'Servidor';
+  const channelName = String(thread.name || 'ticket').replace(/^[^#]*/, '').trim() || String(thread.name || 'ticket');
+  const ownerId = threadOwner(thread);
+  const stateInfo = state(thread);
+  const opener = ownerId ? `@${ownerId}` : 'Usuário';
+  const openedAt = messages[0]?.createdTimestamp || Date.now();
+  const date = new Date(openedAt).toLocaleString('pt-BR');
+  const avatarFor = message => {
+    try { return message.author?.displayAvatarURL?.({ extension: 'png', size: 64 }) || ''; } catch (_) { return ''; }
+  };
+  const messageRows = messages.map(message => {
+    const avatar = avatarFor(message);
+    const avatarHtml = avatar ? `<img class="avatar" src="${escapeHtml(avatar)}" alt="">` : '<div class="avatar avatar-fallback">●</div>';
+    const content = escapeHtml(message.cleanContent || '[anexo, imagem ou componente]').replace(/\n/g, '<br>');
+    const attachments = [...(message.attachments?.values?.() || [])].map(file => `<div class="attachment"><a href="${escapeHtml(file.url)}" target="_blank" rel="noreferrer">📎 ${escapeHtml(file.name || 'Anexo')}</a></div>`).join('');
+    return `<div class="message"><div class="avatar-wrap">${avatarHtml}</div><div class="message-body"><div class="author">${escapeHtml(message.author?.tag || 'Usuário')}<span class="timestamp">${new Date(message.createdTimestamp).toLocaleString('pt-BR')}</span></div><div class="content">${content}${attachments}</div></div></div>`;
   }).join('\n');
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Transcript ${escapeHtml(thread.name)}</title><style>body{font-family:Arial,sans-serif;background:#f4f5f7;color:#202225;margin:0;padding:24px}.wrap{max-width:900px;margin:auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 10px #0001}h1{margin-top:0;color:#5865f2}.meta{font-size:12px;color:#68727d;margin-bottom:6px}.content{white-space:normal;line-height:1.45}article{border-top:1px solid #e5e7eb;padding:14px 0}</style></head><body><main class="wrap"><h1>Transcript do ticket</h1><p><b>Thread:</b> ${escapeHtml(thread.name)}<br><b>ID:</b> ${escapeHtml(thread.id)}<br><b>Gerado em:</b> ${escapeHtml(new Date().toLocaleString('pt-BR'))}</p>${rows || '<p>Ticket sem mensagens.</p>'}</main></body></html>`;
+  const controls = ['Fechar Ticket', 'Assumir Ticket', 'Assumir Admin', 'Renomear Canal', 'Adicionar Membro', 'Remover Membro'].map(label => `<span class="control">${label}</span>`).join('');
+  const storeTitle = String(profile.name || guildName).toUpperCase();
+  const logo = profile.icon && /^https?:\/\//i.test(profile.icon) ? `<img class="logo" src="${escapeHtml(profile.icon)}" alt="">` : '';
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(channelName)}</title><style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#23272a;--muted:#747f8d;--line:#e4e7eb;--accent:#5865f2;--green:#43b581}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--ink)}.page{max-width:1040px;margin:0 auto;padding:28px 22px 48px}.brand{font-size:26px;font-weight:800;letter-spacing:.5px;margin:4px 0 22px;display:flex;align-items:center;gap:10px}.logo{width:34px;height:34px;border-radius:50%;object-fit:cover}.channel-title{font-size:24px;font-weight:700;margin:0 0 8px}.start{color:var(--muted);font-size:14px;margin-bottom:18px}.summary{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:18px 20px;box-shadow:0 1px 3px #0000000a}.summary-head{font-size:14px;margin-bottom:12px}.summary-head b{color:var(--accent)}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 26px;font-size:14px}.field-label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.4px}.field-value{font-weight:600;margin-top:3px}.controls{display:flex;gap:7px;flex-wrap:wrap;margin:16px 0 22px}.control{background:#e9eaed;color:#4f5660;border-radius:4px;padding:7px 10px;font-size:12px;font-weight:600}.messages{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 20px}.message{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid #f0f1f3}.message:last-child{border-bottom:0}.avatar-wrap{flex:0 0 40px}.avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#5865f2}.avatar-fallback{display:flex;align-items:center;justify-content:center;color:white;font-size:18px}.author{font-weight:700;font-size:14px}.timestamp{font-size:12px;color:var(--muted);font-weight:400;margin-left:9px}.content{font-size:14px;line-height:1.55;margin-top:5px;white-space:normal}.attachment{margin-top:8px}.attachment a{color:var(--accent);text-decoration:none}.footer{display:flex;justify-content:space-between;align-items:center;margin-top:22px;color:var(--muted);font-size:13px}.finished{color:var(--green);font-weight:700}@media(max-width:650px){.page{padding:18px 12px}.fields{grid-template-columns:1fr}.messages{padding:4px 12px}.timestamp{display:block;margin:4px 0 0}}
+</style></head><body><main class="page"><div class="brand">${logo}${escapeHtml(storeTitle)}</div><h1 class="channel-title">#🛠️┋${escapeHtml(channelName)}</h1><div class="start">This is the start of #🛠️┋${escapeHtml(channelName)} channel.</div><section class="summary"><div class="summary-head">${escapeHtml(guildName)} TicketBot <span class="muted">${escapeHtml(date)}</span></div><div class="fields"><div><div class="field-label">Aberto por</div><div class="field-value">${escapeHtml(opener)}</div></div><div><div class="field-label">Motivo</div><div class="field-value">${escapeHtml(stateInfo.reason || 'Suporte')}</div></div><div><div class="field-label">Status</div><div class="field-value">${escapeHtml(stateInfo.status || 'Aberto')}</div></div><div><div class="field-label">ID do Ticket</div><div class="field-value">${escapeHtml(thread.id)}</div></div></div></section><div class="controls">${controls}</div><section class="messages">${messageRows || '<div class="message">Ticket sem mensagens.</div>'}</section><div class="footer"><span class="finished">Finalizado</span><span>Exported ${messages.length} messages.</span></div></main></body></html>`;
   return { attachment: Buffer.from(html, 'utf8'), name: `transcript-${thread.id}.html` };
 }
-
 async function sendTranscript(interaction, finalized = false) {
   const attachment = await buildTranscript(interaction.channel);
   const c = config();
