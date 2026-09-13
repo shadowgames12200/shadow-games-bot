@@ -10,6 +10,7 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 const { configuracao, estatisticas, tickets } = require('./DataBaseJson');
+const { createTicketFromModal } = require('./Functions/CreateTicket');
 
 const QUICK_REPLIES = {
   pagamento: 'Olá! Vou verificar o pagamento e retorno com uma atualização em breve.',
@@ -151,13 +152,65 @@ function publicPanel(interaction) {
     .setTimestamp();
   if (appearance.color) embed.setColor(appearance.color);
   if (appearance.banner) embed.setImage(appearance.banner);
-  const entries = Object.entries(functions).slice(0, 25);
+  const entries = Object.entries(functions).slice(0, 5);
   if (!entries.length) return { embeds: [embed], content: '⚠️ Configure pelo menos uma função de ticket antes de publicar o painel.' };
-  if (entries.length === 1) {
-    const [key, item] = entries[0];
-    return { embeds: [embed], components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`AbrirTicket_${item.nome || key}`).setLabel(String(item.nome || key).slice(0, 80)).setStyle(ButtonStyle.Primary))] };
+  const buttons = entries.map(([key, item]) => {
+    const button = new ButtonBuilder().setCustomId(`AbrirTicket_${key}`).setLabel(String(item.nome || key).slice(0, 80)).setStyle(ButtonStyle.Primary);
+    if (item.emoji) button.setEmoji(item.emoji);
+    return button;
+  });
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(buttons)] };
+}
+
+function clientAddMemberModal() {
+  return new ModalBuilder().setCustomId('ticket_client_add_member_modal').setTitle('Adicionar membro ao ticket').addComponents(
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ticket_member_id').setLabel('ID ou menção do usuário').setPlaceholder('Ex.: 123456789012345678').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(25))
+  );
+}
+function clientOptionText(value) {
+  return {
+    payment: '💳 O cliente selecionou **Informar pagamento**. Envie o comprovante ou os detalhes do pagamento neste ticket.',
+    update: '📦 O cliente solicitou uma **atualização do pedido**. A equipe será avisada para verificar o status.',
+    info: '📝 O cliente deseja **enviar outra informação**. Escreva os detalhes na próxima mensagem.',
+  }[value] || '';
+}
+async function handleClientInteraction(interaction) {
+  if (!interaction.channel?.isThread?.() || !isLegacyThread(interaction.channel)) return false;
+  const id = interaction.customId || '';
+  const owner = threadOwner(interaction.channel);
+  if (interaction.isButton?.() && id === 'ticket_not_product') {
+    if (String(interaction.user.id) !== String(owner)) return interaction.reply({ content: '❌ Apenas o cliente deste ticket pode usar esta opção.', ephemeral: true });
+    await interaction.reply({ content: '✅ Informe na conversa o que você precisa. A equipe será avisada.', ephemeral: true });
+    await interaction.channel.send(`🆘 <@${owner}> informou que o assunto **não é sobre um produto adquirido**.`);
+    return true;
   }
-  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('abrirticket').setPlaceholder('Clique aqui para ver as opções').addOptions(entries.map(([key, item]) => ({ value: key, label: String(item.nome || key).slice(0, 100), description: String(item.descricao || item.predescricao || '').slice(0, 100), ...(item.emoji ? { emoji: item.emoji } : {}) }))))] };
+  if (interaction.isStringSelectMenu?.() && id === 'ticket_client_options') {
+    const value = interaction.values[0];
+    if (value === 'add_member') return interaction.showModal(clientAddMemberModal()).then(() => true);
+    const text = clientOptionText(value);
+    if (!text) return interaction.reply({ content: '❌ Opção indisponível.', ephemeral: true }).then(() => true);
+    await interaction.reply({ content: '✅ Solicitação enviada à equipe.', ephemeral: true });
+    await interaction.channel.send(`${text}\n👤 Solicitado por <@${interaction.user.id}>.`);
+    return true;
+  }
+  if (interaction.isStringSelectMenu?.() && id === 'ticket_client_purchase') {
+    const item = estatisticas.get(interaction.values[0]);
+    if (!item || String(item.userid) !== String(owner)) return interaction.reply({ content: '❌ Compra não encontrada para este ticket.', ephemeral: true }).then(() => true);
+    saveState(interaction.channel, { linkedPurchase: interaction.values[0] });
+    await interaction.reply({ content: `✅ Compra vinculada: **${String(item.campo || item.produto || 'Produto').slice(0, 100)}** • Quantidade: **${item.quantidade || 1}** • Valor: **R$ ${Number(item.valor || 0).toFixed(2)}**`, ephemeral: true });
+    return true;
+  }
+  if (interaction.isModalSubmit?.() && id === 'ticket_client_add_member_modal') {
+    if (String(interaction.user.id) !== String(owner)) return interaction.reply({ content: '❌ Apenas o cliente que abriu o ticket pode adicionar alguém.', ephemeral: true }).then(() => true);
+    const memberId = interaction.fields.getTextInputValue('ticket_member_id').replace(/[^0-9]/g, '');
+    if (!/^\d{17,20}$/.test(memberId)) return interaction.reply({ content: '❌ ID de usuário inválido.', ephemeral: true }).then(() => true);
+    await interaction.deferReply({ ephemeral: true });
+    try { await interaction.channel.members.add(memberId); } catch (_) { await interaction.editReply({ content: '❌ Não consegui adicionar esse usuário. Confira o ID e as permissões do bot.' }); return true; }
+    await interaction.editReply({ content: `✅ <@${memberId}> foi adicionado ao ticket.` });
+    await interaction.channel.send(`👤 <@${interaction.user.id}> adicionou <@${memberId}> ao ticket.`);
+    return true;
+  }
+  return false;
 }
 
 function escapeHtml(value) {
@@ -254,7 +307,11 @@ async function sendTranscript(interaction, finalized = false) {
 }
 
 async function handle(interaction) {
+  if (interaction.isModalSubmit?.() && interaction.customId?.startsWith('ticket_open_form_')) return createTicketFromModal(interaction);
   if (interaction.isButton?.() && interaction.customId?.startsWith('ticket_rating_')) return handleRating(interaction);
+  if (interaction.isButton?.() || interaction.isStringSelectMenu?.() || interaction.isModalSubmit?.()) {
+    if (await handleClientInteraction(interaction)) return true;
+  }
   if (!interaction.guild || !isLegacyThread(interaction.channel)) return false;
   const id = interaction.customId || '';
   if (id.startsWith('ticket_') && !isStaff(interaction)) {
