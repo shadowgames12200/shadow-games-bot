@@ -164,6 +164,49 @@ function escapeHtml(value) {
   return String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
+function storeProfile() {
+  return {
+    name: tickets.get('tickets.storeName') || configuracao.get('Config.NomeServidor') || 'Shadow Games',
+    icon: tickets.get('tickets.storeIcon') || tickets.get('tickets.aparencia.logo') || configuracao.get('Config.Logo') || ''
+  };
+}
+
+function ratingRow(threadId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`ticket_rating_1_${threadId}`).setLabel('Péssimo').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`ticket_rating_2_${threadId}`).setLabel('Ruim').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`ticket_rating_3_${threadId}`).setLabel('Médio').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`ticket_rating_4_${threadId}`).setLabel('Bom').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`ticket_rating_5_${threadId}`).setLabel('Excelente').setStyle(ButtonStyle.Success)
+  );
+}
+
+function closedTicketCard(thread, closer, transcriptUrl) {
+  const profile = storeProfile();
+  const s = state(thread);
+  const embed = new EmbedBuilder().setColor('#2ecc71').setTitle(`${profile.name} Ticket`).setDescription(
+    `## Seu atendimento foi finalizado!\n\n` +
+    `📄 **Considerações finais:**\nFinalizado\n\n` +
+    `👤 **Staff:**\n${closer}\n\n` +
+    `🆔 **ID:**\n${thread.id}\n\n` +
+    `📌 **Motivo:**\n${s.reason || 'Suporte'}\n\n` +
+    `Obrigado por usar o suporte!`
+  ).setFooter({ text: profile.name });
+  if (profile.icon && /^https?:\/\//i.test(profile.icon)) embed.setThumbnail(profile.icon);
+  const components = [ratingRow(thread.id)];
+  if (transcriptUrl) components.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel('Abrir Transcript').setEmoji('↗').setStyle(ButtonStyle.Link).setURL(transcriptUrl)));
+  return { embeds: [embed], components };
+}
+
+async function handleRating(interaction) {
+  const parts = interaction.customId.split('_');
+  const rating = Number(parts[2]);
+  const threadId = parts.slice(3).join('_');
+  const key = `tickets.ratings.${threadId}`;
+  tickets.set(key, { rating, userId: interaction.user.id, at: new Date().toISOString() });
+  return interaction.reply({ content: `✅ Obrigado pela avaliação: **${['', 'Péssimo', 'Ruim', 'Médio', 'Bom', 'Excelente'][rating]}**.`, ephemeral: true });
+}
+
 async function buildTranscript(thread) {
   const messages = await thread.messages.fetch({ limit: 100 });
   const rows = [...messages.values()].reverse().map(message => {
@@ -175,22 +218,27 @@ async function buildTranscript(thread) {
   return { attachment: Buffer.from(html, 'utf8'), name: `transcript-${thread.id}.html` };
 }
 
-async function sendTranscript(interaction) {
+async function sendTranscript(interaction, finalized = false) {
   const attachment = await buildTranscript(interaction.channel);
   const c = config();
   const owner = await interaction.client.users.fetch(threadOwner(interaction.channel)).catch(() => null);
   const target = c.transcriptChannelId ? await interaction.client.channels.fetch(c.transcriptChannelId).catch(() => null) : null;
   const sent = { channel: false, user: false };
+  let transcriptUrl = '';
   if (target?.isTextBased?.()) {
-    await target.send({ content: `📄 Transcript do ticket **${interaction.channel.name}** fechado por ${interaction.user}.`, files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] }).then(() => { sent.channel = true; }).catch(error => console.error('[LegacyTicketStaff] transcript channel send failed', error));
+    await target.send({ content: `📄 Transcript do ticket **${interaction.channel.name}** fechado por ${interaction.user}.`, files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] }).then(message => { sent.channel = true; transcriptUrl = message.attachments.first()?.url || ''; }).catch(error => console.error('[LegacyTicketStaff] transcript channel send failed', error));
   }
+  const card = closedTicketCard(interaction.channel, interaction.user, transcriptUrl);
+  if (finalized && target?.isTextBased?.()) await target.send(card).catch(error => console.error('[LegacyTicketStaff] closing card channel send failed', error));
   if (owner) {
-    await owner.send({ content: `📄 Seu ticket foi encerrado. Segue o transcript do atendimento.`, files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] }).then(() => { sent.user = true; }).catch(error => console.error('[LegacyTicketStaff] transcript DM failed', error));
+    const payload = finalized ? (transcriptUrl ? card : { ...card, content: '📄 Seu ticket foi encerrado. O transcript está anexado abaixo.', files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] }) : { content: '📄 Transcript do atendimento.', files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] };
+    await owner.send(payload).then(() => { sent.user = true; }).catch(error => console.error('[LegacyTicketStaff] transcript DM failed', error));
   }
-  return { attachment, sent };
+  return { attachment, sent, transcriptUrl };
 }
 
 async function handle(interaction) {
+  if (interaction.isButton?.() && interaction.customId?.startsWith('ticket_rating_')) return handleRating(interaction);
   if (!interaction.guild || !isLegacyThread(interaction.channel)) return false;
   const id = interaction.customId || '';
   if (id.startsWith('ticket_') && !isStaff(interaction)) {
@@ -208,12 +256,12 @@ async function handle(interaction) {
       return interaction.reply({ content: `✅ Ticket assumido por ${interaction.user}. Status: **${s.status}**.` });
     }
     if (id === 'ticket_transcript') {
-      const result = await sendTranscript(interaction);
+      const result = await sendTranscript(interaction, false);
       return interaction.reply({ content: `✅ Transcript HTML gerado.${result.sent.channel ? ' Enviado ao canal configurado.' : ''}${result.sent.user ? ' Enviado ao solicitante por DM.' : ' Não foi possível enviar DM ao solicitante.'}`, ephemeral: true });
     }
     if (id === 'ticket_close') {
       await interaction.deferReply({ ephemeral: true });
-      const result = await sendTranscript(interaction);
+      const result = await sendTranscript(interaction, true);
       saveState(interaction.channel, { status: 'resolvido' });
       await interaction.editReply({ content: `✅ Ticket fechado e transcript HTML gerado.${result.sent.channel ? ' Enviado ao canal configurado.' : ''}${result.sent.user ? ' Enviado ao solicitante por DM.' : ' Não foi possível enviar DM ao solicitante.'}` });
       return interaction.channel.setArchived(true, `Fechado por ${interaction.user.tag}`).catch(() => {});
