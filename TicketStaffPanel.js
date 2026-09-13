@@ -6,6 +6,7 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 const { db } = require('./ProfessionalSuite');
+const { staffPanel: legacyStaffPanel, isLegacyThread } = require('./LegacyTicketStaff');
 
 const DEFAULT_BUTTONS = ['notify', 'claim', 'transcript', 'close'];
 
@@ -54,6 +55,7 @@ function controlButtons(guildId) {
 }
 
 function staffPanel(interaction) {
+  if (isLegacyThread(interaction.channel)) return legacyStaffPanel(interaction);
   const info = ticketInfo(interaction.channel);
   if (!info.userId) return interaction.reply({ content: '❌ Use este comando dentro de um canal de ticket.', ephemeral: true });
   const teams = db.ticketConfig?.teams || {};
