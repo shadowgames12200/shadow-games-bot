@@ -206,13 +206,18 @@ async function handleClientInteraction(interaction) {
     return true;
   }
   if (interaction.isModalSubmit?.() && id === 'ticket_client_add_member_modal') {
-    if (String(interaction.user.id) !== String(owner)) return interaction.reply({ content: '❌ Apenas o cliente que abriu o ticket pode adicionar alguém.', ephemeral: true }).then(() => true);
+    if (String(interaction.user.id) !== String(owner)) return interaction.reply({ content: '❌ Apenas o cliente que abriu o ticket pode solicitar alguém.', ephemeral: true }).then(() => true);
     const memberId = interaction.fields.getTextInputValue('ticket_member_id').replace(/[^0-9]/g, '');
     if (!/^\d{17,20}$/.test(memberId)) return interaction.reply({ content: '❌ ID de usuário inválido.', ephemeral: true }).then(() => true);
-    await interaction.deferReply({ ephemeral: true });
-    try { await interaction.channel.members.add(memberId); } catch (_) { await interaction.editReply({ content: '❌ Não consegui adicionar esse usuário. Confira o ID e as permissões do bot.' }); return true; }
-    await interaction.editReply({ content: `✅ <@${memberId}> foi adicionado ao ticket.` });
-    await interaction.channel.send(`👤 <@${interaction.user.id}> adicionou <@${memberId}> ao ticket.`);
+    if (memberId === String(owner)) return interaction.reply({ content: '❌ Esse usuário já é o dono do ticket.', ephemeral: true }).then(() => true);
+    const requestId = `${Date.now()}_${memberId}`;
+    tickets.set(`tickets.memberRequests.${interaction.channel.id}.${requestId}`, { memberId, requesterId: interaction.user.id, status: 'pending', createdAt: Date.now() });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`ticket_member_accept_${requestId}`).setLabel('Aceitar').setEmoji('✅').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`ticket_member_reject_${requestId}`).setLabel('Recusar').setEmoji('❌').setStyle(ButtonStyle.Danger)
+    );
+    await interaction.reply({ content: '✅ Solicitação enviada para a equipe.', ephemeral: true });
+    await interaction.channel.send({ content: `👤 **Solicitação para adicionar membro**\n<@${interaction.user.id}> solicitou adicionar <@${memberId}> ao ticket.\nA equipe deve escolher **Aceitar** ou **Recusar**.`, components: [row] });
     return true;
   }
   return false;
@@ -324,6 +329,28 @@ async function handle(interaction) {
   const id = interaction.customId || '';
   if (id.startsWith('ticket_') && !isStaff(interaction)) {
     if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Apenas a equipe autorizada pode usar esta ferramenta.', ephemeral: true });
+    return true;
+  }
+  if (interaction.isButton?.() && (id.startsWith('ticket_member_accept_') || id.startsWith('ticket_member_reject_'))) {
+    if (!isStaff(interaction)) return interaction.reply({ content: '❌ Apenas a equipe autorizada ou o dono do servidor pode decidir esta solicitação.', ephemeral: true });
+    const accepted = id.startsWith('ticket_member_accept_');
+    const requestId = id.replace(/^ticket_member_(?:accept|reject)_/, '');
+    const request = tickets.get(`tickets.memberRequests.${interaction.channel.id}.${requestId}`);
+    if (!request || request.status !== 'pending') return interaction.reply({ content: '⚠️ Esta solicitação já foi resolvida ou expirou.', ephemeral: true });
+    if (!accepted) {
+      tickets.set(`tickets.memberRequests.${interaction.channel.id}.${requestId}`, { ...request, status: 'rejected', decidedBy: interaction.user.id, decidedAt: Date.now() });
+      await interaction.update({ content: `❌ Solicitação recusada por ${interaction.user}.\nUsuário solicitado: <@${request.memberId}>.`, components: [] });
+      return true;
+    }
+    await interaction.deferUpdate();
+    try {
+      await interaction.channel.members.add(request.memberId);
+      tickets.set(`tickets.memberRequests.${interaction.channel.id}.${requestId}`, { ...request, status: 'accepted', decidedBy: interaction.user.id, decidedAt: Date.now() });
+      await interaction.editReply({ content: `✅ Solicitação aceita por ${interaction.user}.\n<@${request.memberId}> foi adicionado ao ticket.`, components: [] });
+      await interaction.channel.send(`👤 <@${request.memberId}> foi adicionado ao ticket após aprovação de ${interaction.user}.`);
+    } catch (_) {
+      await interaction.editReply({ content: '❌ Não foi possível adicionar esse usuário. Verifique o ID e as permissões do bot.', components: [] });
+    }
     return true;
   }
   if (interaction.isButton?.()) {
