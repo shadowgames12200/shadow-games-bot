@@ -87,6 +87,7 @@ function saveState(thread, patch) {
 
 function controlRow() {
   return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('ticket_notify').setLabel('Notificar solicitante').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('ticket_claim').setLabel('Assumir Ticket').setEmoji('🔒').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('ticket_transcript').setLabel('Salvar transcript').setEmoji('📄').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('ticket_close').setLabel('Fechar e Salvar').setEmoji('🔒').setStyle(ButtonStyle.Danger)
@@ -167,6 +168,10 @@ async function handle(interaction) {
     return true;
   }
   if (interaction.isButton?.()) {
+    if (id === 'ticket_notify') {
+      await interaction.channel.send(`🔔 <@${threadOwner(interaction.channel)}> — a equipe foi notificada por ${interaction.user}.`);
+      return interaction.reply({ content: '✅ O solicitante foi notificado.', ephemeral: true });
+    }
     if (id === 'ticket_claim') {
       const s = saveState(interaction.channel, { claimedBy: interaction.user.id, status: 'atendimento' });
       await interaction.channel.setName(`atendimento・${interaction.user.username}・${threadOwner(interaction.channel)}`).catch(() => {});

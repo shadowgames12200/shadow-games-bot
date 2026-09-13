@@ -339,6 +339,7 @@ async function install(client) {
   });
   client.on(Events.InteractionCreate, async interaction => {
     try {
+      if (isLegacyThread(interaction.channel)) return;
       if (interaction.isButton() && interaction.customId.startsWith('ticket_open_button:')) return interaction.showModal(openTicketModal(interaction.customId.split(':')[1]));
       if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category') return interaction.showModal(openTicketModal(interaction.values[0]));
       if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_purchase') return handlePurchase(interaction);
@@ -379,3 +380,4 @@ async function install(client) {
   });
 }
 module.exports = { install, panel, adminPanel, staffPanel, ensure };
+const { isLegacyThread } = require('./LegacyTicketStaff');
