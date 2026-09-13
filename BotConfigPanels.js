@@ -64,11 +64,11 @@ function modal(id, title, fields) { const m = new ModalBuilder().setCustomId(id)
 async function ticketModal(i, page) {
   const c = ensure(i.guild.id).ticket;
   if (page === 'access') return i.showModal(modal('bc_ticket_access_save','Acesso aos tickets',[{id:'assumeRoles',label:'Cargos para assumir (IDs por vírgula)',value:(db.ticketConfig.assumeRoleIds||[]).join(',')},{id:'categoryRoles',label:'Cargos por categoria (chave:IDs)',value:Object.entries(db.ticketConfig.teams||{}).map(([k,t])=>`${k}:${(t.roleIds||t.roleId||'')}`).join(';')},{id:'transcriptChannel',label:'Canal do transcript (ID)',value:c.transcriptChannelId||db.ticketConfig.logsChannelId||''}]));
-  if (page === 'public') return i.showModal(modal('bc_ticket_public_save','Painel público',[{id:'title',label:'Título',value:c.public.title},{id:'description',label:'Descrição',value:c.public.description,long:true},{id:'banner',label:'URL do banner',value:c.public.banner},{id:'color',label:'Cor HEX',value:c.public.color},{id:'buttons',label:'Botões públicos (separados por vírgula)',value:(c.public.buttons||[]).join(',')} ]));
-  if (page === 'internal') return i.showModal(modal('bc_ticket_internal_save','Painel dentro do ticket',[{id:'title',label:'Título',value:c.internal.title},{id:'description',label:'Descrição',value:c.internal.description,long:true},{id:'buttons',label:'Botões: notify, claim, transcript, close',value:c.internal.buttons.join(',')} ]));
-  return i.showModal(modal('bc_ticket_purchase_save','Painel de compras',[{id:'title',label:'Título',value:c.purchases.title},{id:'description',label:'Descrição',value:c.purchases.description,long:true},{id:'enabled',label:'Ativado? sim ou não',value:c.purchases.enabled?'sim':'não'} ]));
+  if (page === 'public') return i.showModal(modal('bc_ticket_public_save','Painel público',[{id:'title',label:'Título',value:c.public.title},{id:'description',label:'Descrição',value:c.public.description,long:true},{id:'banner',label:'URL do banner',value:c.public.banner},{id:'color',label:'Cor HEX',value:c.public.color},{id:'buttons',label:'Botões públicos (separados por vírgula)',value:(c.public.buttons||[]).join(',')}]));
+  if (page === 'internal') return i.showModal(modal('bc_ticket_internal_save','Painel dentro do ticket',[{id:'title',label:'Título',value:c.internal.title},{id:'description',label:'Descrição',value:c.internal.description,long:true},{id:'buttons',label:'Botões: notify, claim, transcript, close',value:c.internal.buttons.join(',')}]));
+  return i.showModal(modal('bc_ticket_purchase_save','Painel de compras',[{id:'title',label:'Título',value:c.purchases.title},{id:'description',label:'Descrição',value:c.purchases.description,long:true},{id:'enabled',label:'Ativado? sim ou não',value:c.purchases.enabled?'sim':'não'}]));
 }
-function logEventMenu(i, clear=false) { const opts = Object.entries(LOG_EVENTS).map(([value,label])=>({label,value,description:i.guild ? (ensure(i.guild.id).logs.channels[value] ? 'Configurado' : 'Não configurado') : ''})); return i.reply({ephemeral:true,content:clear?'Escolha o evento cuja configuração deseja remover:':'Escolha o evento:',components:[row(new StringSelectMenuBuilder().setCustomId(clear?'bc_logs_clear_event':'bc_logs_event').setPlaceholder('Selecione um evento').addOptions(opts.slice(0,25)))]}); }
+function logEventMenu(i, clear=false) { const opts = Object.entries(LOG_EVENTS).map(([value,label])=>({label,value,description:i.guild ? (ensure(i.guild.id).logs.channels[value] ? 'Configurado' : 'Não configurado') : '',})); return i.reply({ephemeral:true,content:clear?'Escolha o evento cuja configuração deseja remover:':'Escolha o evento:',components:[row(new StringSelectMenuBuilder().setCustomId(clear?'bc_logs_clear_event':'bc_logs_event').setPlaceholder('Selecione um evento').addOptions(opts.slice(0,25)))]}); }
 function ticketPublicPayload(guild, c) {
   const teams = db.ticketConfig?.teams || {};
   const selected = (c.public.buttons || []).filter(key => teams[key]);
@@ -92,6 +92,7 @@ async function postTicket(i) {
   return i.reply({ ephemeral: true, content: `✅ Painel publicado em ${ch}.` });
 }
 async function syncTicketPanels(i) {
+  await i.deferReply({ ephemeral: true });
   const c = ensure(i.guild.id).ticket;
   const payload = ticketPublicPayload(i.guild, c);
   let updated = 0;
@@ -104,7 +105,7 @@ async function syncTicketPanels(i) {
       await message.edit(payload).then(() => { updated += 1; }).catch(() => {});
     }
   }
-  return i.reply({ ephemeral: true, content: updated ? `✅ ${updated} painel(is) público(s) de ticket sincronizado(s). O sistema de vendas não foi alterado.` : 'ℹ️ Nenhum painel público de ticket encontrado nas últimas 100 mensagens de cada canal.' });
+  return i.editReply({ content: updated ? `✅ ${updated} painel(is) público(s) de ticket sincronizado(s). O sistema de vendas não foi alterado.` : 'ℹ️ Nenhum painel público de ticket encontrado nas últimas 100 mensagens de cada canal.' });
 }
 async function handle(i) {
   const id=i.customId||'';
@@ -119,6 +120,7 @@ async function handle(i) {
   if(i.isStringSelectMenu?.() && (id==='bc_logs_event'||id==='bc_logs_clear_event')) { const key=i.values[0]; if(id==='bc_logs_clear_event'){delete ensure(i.guild.id).logs.channels[key];save();return logsHome(i);} return i.reply({ephemeral:true,content:`Escolha o canal para **${LOG_EVENTS[key]}**:`,components:[row(new ChannelSelectMenuBuilder().setCustomId(`bc_logs_channel:${key}`).setPlaceholder('Selecione um canal').setChannelTypes(ChannelType.GuildText))]}); }
   if(i.isChannelSelectMenu?.() && id==='bc_ticket_channel_select') { ensure(i.guild.id).ticket.public.channelId=i.values[0]; save(); return ticketHome(i); }
   if(i.isChannelSelectMenu?.() && id.startsWith('bc_logs_channel:')) { const key=id.split(':')[1]; ensure(i.guild.id).logs.channels[key]=i.values[0]; save(); return logsHome(i); }
+  if(i.isModalSubmit?.() && !id.startsWith('bc_')) return false;
   if(i.isModalSubmit?.()) {
     const c = ensure(i.guild.id);
     const v = x => i.fields.getTextInputValue(x).trim();
