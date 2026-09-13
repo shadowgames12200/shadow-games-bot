@@ -223,7 +223,8 @@ async function claimTicket(interaction) {
   await interaction.channel.permissionOverwrites.edit(interaction.user.id, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }).catch(() => {});
   return interaction.reply({ content: `🔒 Ticket assumido por ${interaction.user}. Os demais atendentes não poderão assumir este ticket.` });
 }
-async function transcript(channel) {
+const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+async function transcriptMessages(channel) {
   const messages = [];
   let before;
   while (true) {
@@ -233,11 +234,25 @@ async function transcript(channel) {
     before = batch.last().id;
     if (batch.size < 100) break;
   }
-  return messages.reverse().map(message => {
-    const attachments = [...message.attachments.values()].map(file => file.url).join(' ');
-    const embeds = message.embeds.length ? ` [${message.embeds.map(embed => embed.title || embed.description || 'embed').join(' | ')}]` : '';
-    return `[${message.createdAt.toISOString()}] ${message.author.tag}: ${message.content || ''}${embeds}${attachments ? ` Anexos: ${attachments}` : ''}`;
+  return messages.reverse();
+}
+function transcriptHtml(channel, messages) {
+  const info = topicInfo(channel);
+  const opener = messages.find(message => message.author.id === info.userId)?.author;
+  const rows = messages.map(message => {
+    const avatar = message.author.displayAvatarURL?.({ extension: 'png', size: 64 }) || '';
+    const fromClient = message.author.id === info.userId;
+    const role = fromClient ? 'Cliente' : 'Equipe';
+    const attachments = [...message.attachments.values()].map(file => {
+      const image = String(file.contentType || '').startsWith('image/') ? `<img class="image" src="${escapeHtml(file.url)}" alt="${escapeHtml(file.name || 'Imagem')}">` : '';
+      return `<a class="attachment" href="${escapeHtml(file.url)}" target="_blank" rel="noopener">${image}<span>📎 ${escapeHtml(file.name || 'Anexo')}</span></a>`;
+    }).join('');
+    const embeds = message.embeds.map(embed => `<div class="embed"><strong>${escapeHtml(embed.title || 'Embed')}</strong>${embed.description ? `<p>${escapeHtml(embed.description)}</p>` : ''}${embed.url ? `<a href="${escapeHtml(embed.url)}" target="_blank" rel="noopener">Abrir link</a>` : ''}</div>`).join('');
+    return `<article class="message ${fromClient ? 'client' : 'staff'}"><img class="avatar" src="${escapeHtml(avatar)}" alt=""><div class="body"><div class="meta"><strong>${escapeHtml(message.author.globalName || message.author.username || message.author.tag)}</strong><span class="badge">${role}</span><span>${escapeHtml(message.createdAt.toLocaleString('pt-BR'))}</span></div><div class="content">${escapeHtml(message.content || '') || '<em>sem texto</em>'}</div>${embeds}${attachments}</div></article>`;
   }).join('\n');
+  const openedAt = channel.createdAt?.toLocaleString('pt-BR') || messages[0]?.createdAt?.toLocaleString('pt-BR') || new Date().toLocaleString('pt-BR');
+  const author = opener ? `${opener.globalName || opener.username || opener.tag} (<@${opener.id}>)` : `<@${info.userId || 'desconhecido'}>`;
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Transcript - ${escapeHtml(channel.name)}</title><style>body{margin:0;background:#313338;color:#dbdee1;font:15px Arial,sans-serif}.wrap{max-width:960px;margin:0 auto;background:#2b2d31;min-height:100vh}.header{padding:28px 32px;background:#1e1f22;border-bottom:4px solid #7c3aed}.header h1{margin:0 0 8px;color:#fff}.header p{margin:4px 0;color:#b5bac1}.legend{margin-top:16px;display:flex;gap:10px}.legend span,.badge{padding:3px 7px;border-radius:10px;font-size:11px}.legend .client,.client .badge{background:#2563eb;color:#fff}.legend .staff,.staff .badge{background:#16a34a;color:#fff}.message{display:flex;gap:14px;padding:16px 32px;border-bottom:1px solid #3f4147}.message.client{background:rgba(37,99,235,.06)}.message.staff{background:rgba(22,163,74,.04)}.avatar{width:40px;height:40px;border-radius:50%;background:#5865f2}.body{flex:1;min-width:0}.meta{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.meta strong{color:#fff}.meta span:not(.badge){color:#949ba4;font-size:12px}.content{margin-top:5px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45}.attachment{display:inline-flex;flex-direction:column;vertical-align:top;margin:10px 8px 0 0;padding:8px 10px;background:#1e1f22;border-radius:4px;color:#00aff4;text-decoration:none}.image{max-width:360px;max-height:240px;border-radius:4px;margin-bottom:6px}.embed{margin-top:10px;padding:10px 14px;border-left:4px solid #5865f2;background:#1e1f22;border-radius:4px}.embed p{white-space:pre-wrap}.footer{padding:24px 32px;color:#949ba4;text-align:center}</style></head><body><main class="wrap"><header class="header"><h1>Transcript — #${escapeHtml(channel.name)}</h1><p>Autor do ticket: ${escapeHtml(author)}</p><p>Aberto em: ${escapeHtml(openedAt)} • ${messages.length} mensagens</p><div class="legend"><span class="client">Cliente</span><span class="staff">Equipe</span></div></header>${rows || '<p style="padding:32px">Nenhuma mensagem.</p>'}<footer class="footer">Transcript gerado automaticamente pelo Atendente Shadow</footer></main></body></html>`;
 }
 async function saveTranscript(interaction, close = false) {
   const info = topicInfo(interaction.channel), team = teamFor(info.team);
@@ -245,18 +260,19 @@ async function saveTranscript(interaction, close = false) {
   const logId = transcriptChannelId(interaction.guild.id);
   const log = logId ? await interaction.guild.channels.fetch(logId).catch(() => null) : null;
   if (!log?.isTextBased()) return interaction.reply({ content: '❌ Configure um canal de transcript no painel de configuração.', ephemeral: true });
-  const content = await transcript(interaction.channel);
-  await log.send({ content: `📄 Transcript: **${interaction.channel.name}** salvo por ${interaction.user}\nSolicitante: <@${info.userId}>`, files: [new AttachmentBuilder(Buffer.from(content || 'Sem mensagens.'), { name: `${interaction.channel.name}.txt` })] });
-  return interaction.reply({ content: '✅ Transcript salvo no canal configurado.', ephemeral: true });
+  const html = transcriptHtml(interaction.channel, await transcriptMessages(interaction.channel));
+  const saved = await log.send({ content: `📄 Transcript HTML: **${interaction.channel.name}** salvo por ${interaction.user}\nSolicitante: <@${info.userId}>`, files: [new AttachmentBuilder(Buffer.from(html), { name: `${interaction.channel.name}-transcript.html` })] });
+  const download = saved.attachments.first()?.url;
+  return interaction.reply({ content: download ? `✅ Transcript HTML salvo. [Baixar transcript no navegador](${download})` : '✅ Transcript HTML salvo no canal configurado.', ephemeral: true });
 }
 async function closeTicket(interaction) {
   const info = topicInfo(interaction.channel), team = teamFor(info.team);
   if (!isStaff(interaction, team)) return interaction.reply({ content: '❌ Somente a equipe pode fechar este ticket.', ephemeral: true });
   await interaction.deferReply({ ephemeral: true });
-  const content = await transcript(interaction.channel), transcriptName = `${interaction.channel.name}.txt`, makeTranscriptFile = () => new AttachmentBuilder(Buffer.from(content || 'Sem mensagens.'), { name: transcriptName }), logId = transcriptChannelId(interaction.guild.id), log = logId ? await interaction.guild.channels.fetch(logId).catch(() => null) : null;
+  const html = transcriptHtml(interaction.channel, await transcriptMessages(interaction.channel)), transcriptName = `${interaction.channel.name}-transcript.html`, makeTranscriptFile = () => new AttachmentBuilder(Buffer.from(html), { name: transcriptName }), logId = transcriptChannelId(interaction.guild.id), log = logId ? await interaction.guild.channels.fetch(logId).catch(() => null) : null;
   if (!log?.isTextBased()) return interaction.editReply({ content: '❌ Não foi possível fechar: configure um canal de transcript válido no /botconfig ticket.' });
   try {
-    await log.send({ content: `📁 Transcript obrigatório: **${interaction.channel.name}** por ${interaction.user}\nSolicitante: <@${info.userId}>`, files: [makeTranscriptFile()] });
+    var saved = await log.send({ content: `📁 Transcript HTML obrigatório: **${interaction.channel.name}** por ${interaction.user}\nSolicitante: <@${info.userId}>`, files: [makeTranscriptFile()] });
   } catch (error) {
     console.error('[TicketControlSuite] transcript before close failed', error);
     return interaction.editReply({ content: '❌ Não foi possível salvar o transcript. O ticket não foi excluído.' });
@@ -264,8 +280,9 @@ async function closeTicket(interaction) {
   if (slaTimers.has(interaction.channel.id)) { clearTimeout(slaTimers.get(interaction.channel.id)); slaTimers.delete(interaction.channel.id); }
   db.ticketStats ||= { opened: 0, closed: 0, ratings: [] }; db.ticketStats.closed = (db.ticketStats.closed || 0) + 1; save();
   const requester = await interaction.guild.members.fetch(info.userId).catch(() => null);
-  if (requester) requester.send({ content: `📄 O transcript do seu ticket **${interaction.channel.name}** foi salvo.`, files: [makeTranscriptFile()], components: [new ActionRowBuilder().addComponents(...[1,2,3,4,5].map(n => new ButtonBuilder().setCustomId(`ticket_rate_${n}`).setLabel(String(n)).setStyle(ButtonStyle.Secondary)))] }).catch(error => console.error('[TicketControlSuite] requester transcript DM failed', error));
-  await interaction.editReply({ content: '✅ Transcrição completa salva. O ticket será deletado em instantes.' });
+  const download = saved?.attachments.first()?.url;
+  if (requester) requester.send({ content: `📄 O transcript HTML do seu ticket **${interaction.channel.name}** foi salvo.${download ? `\n🔗 [Baixar transcript no navegador](${download})` : ''}`, files: [makeTranscriptFile()], components: [new ActionRowBuilder().addComponents(...[1,2,3,4,5].map(n => new ButtonBuilder().setCustomId(`ticket_rate_${n}`).setLabel(String(n)).setStyle(ButtonStyle.Secondary)))] }).catch(error => console.error('[TicketControlSuite] requester transcript DM failed', error));
+  await interaction.editReply({ content: download ? `✅ Transcript HTML salvo. [Baixar transcript no navegador](${download})\nO ticket será fechado em instantes.` : '✅ Transcrição HTML salva. O ticket será fechado em instantes.' });
   setTimeout(() => interaction.channel.delete('Ticket encerrado após salvar transcrição').catch(() => {}), 1500);
 }
 async function handlePurchase(interaction) {
