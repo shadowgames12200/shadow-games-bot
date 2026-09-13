@@ -1,9 +1,13 @@
 const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
+
+
+
 const { db, save } = require('./ProfessionalSuite');
 const COLORS = { main: '#7c3aed', good: '#22c55e', bad: '#ef4444', info: '#3b82f6', warn: '#f59e0b' };
 const EVENTS = { membro_entrada: 'Entrada no servidor', membro_saida: 'Saída do servidor', banimento: 'Banimento', desbanimento: 'Desbanimento', voz_entrada: 'Entrada em voz', voz_saida: 'Saída da voz', voz_mudanca: 'Mudança de voz', mensagem_apagada: 'Mensagem apagada', mensagem_editada: 'Mensagem editada', ticket_aberto: 'Ticket aberto', ticket_fechado: 'Ticket fechado', ticket_assumido: 'Ticket assumido', canal_criado: 'Canal criado', canal_apagado: 'Canal apagado', cargo_criado: 'Cargo criado', cargo_removido: 'Cargo removido', convite_criado: 'Convite criado', convite_excluido: 'Convite excluído' };
 const LEGACY = { membros: 'membro_entrada', mensagens: 'mensagem_apagada', tickets: 'ticket_aberto', voz: 'voz_entrada', canais: 'canal_criado', cargos: 'cargo_criado', convites: 'convite_criado', moderacao: 'banimento' };
-function eventKey(value) { const key = String(value || '').toLowerCase(); return EVENTS[key] ? key : LEGACY[key] || key; }
+const PANEL_KEYS = { membro_entrada: 'member_join', membro_saida: 'member_leave', banimento: 'ban', desbanimento: 'unban', voz_entrada: 'voice_join', voz_saida: 'voice_leave', voz_mudanca: 'voice_move', mensagem_apagada: 'message_delete', mensagem_editada: 'message_edit', ticket_aberto: 'ticket_open', ticket_fechado: 'ticket_close', ticket_assumido: 'ticket_claim', canal_criado: 'channel_create', canal_apagado: 'channel_delete', cargo_criado: 'role_create', cargo_removido: 'role_delete', convite_criado: 'invite_create', convite_excluido: 'invite_delete' };
+function eventKey(value) { const key = String(value || '').toLowerCase(); return EVENTS[key] ? key : Object.keys(PANEL_KEYS).find(k => PANEL_KEYS[k] === key) || LEGACY[key] || key; }
 function ensure() { db.serverLogs ||= {}; }
 function configFor(guildId) { ensure(); db.serverLogs[guildId] ||= { channelId: '', enabled: true, channels: {} }; db.serverLogs[guildId].channels ||= {}; return db.serverLogs[guildId]; }
 function setChannel(guildId, event, channelId) { const config = configFor(guildId); const key = eventKey(event); if (channelId) config.channels[key] = channelId; else delete config.channels[key]; save(); return config; }
@@ -12,8 +16,10 @@ async function channelFor(guild, event) {
  if (!guild) return null;
  const config = configFor(guild.id);
  if (config.enabled === false) return null;
- const id = config.channels[eventKey(event)] || config.channelId || db.settings?.logChannelId;
- if (!id) { console.warn(`[Logs] Nenhum canal configurado para ${guild.name} (${guild.id}), evento=${eventKey(event)}`); return null; }
+ const key = eventKey(event);
+ const panelChannels = db.botConfig?.[guild.id]?.logs?.channels || {};
+ const id = config.channels[key] || config.channels[PANEL_KEYS[key]] || panelChannels[PANEL_KEYS[key]] || panelChannels[key] || config.channelId || db.settings?.logChannelId;
+ if (!id) { console.warn(`[Logs] Nenhum canal configurado para ${guild.name} (${guild.id}), evento=${key}`); return null; }
  const channel = guild.channels.cache.get(id) || await guild.channels.fetch(id).catch(error => { console.warn(`[Logs] Não foi possível buscar o canal ${id}: ${error.message}`); return null; });
  if (!channel?.isTextBased()) { console.warn(`[Logs] O canal ${id} não é um canal de texto utilizável.`); return null; }
  return channel;
@@ -21,13 +27,7 @@ async function channelFor(guild, event) {
 const clean = (value, max = 900) => String(value ?? 'Sem conteúdo').trim().slice(0, max) || 'Sem conteúdo';
 const who = user => user ? `${user.tag || user.username} (<@${user.id}>)` : 'Desconhecido';
 function embed(title, description, color = COLORS.main) { return new EmbedBuilder().setColor(color).setTitle(title).setDescription(clean(description, 4000)).setTimestamp(); }
-async function send(guild, event, message) {
- const key = eventKey(event);
- const channel = await channelFor(guild, key);
- if (!channel) return false;
- try { await channel.send({ embeds: [message] }); return true; }
- catch (error) { console.error(`[Logs] Falha ao enviar evento ${key} para o canal ${channel.id}: ${error.message}`); return false; }
-}
+async function send(guild, event, message) { const key = eventKey(event); const channel = await channelFor(guild, key); if (!channel) return false; try { await channel.send({ embeds: [message] }); return true; } catch (error) { console.error(`[Logs] Falha ao enviar evento ${key} para o canal ${channel.id}: ${error.message}`); return false; } }
 const isTicket = channel => String(channel?.topic || '').startsWith('ticket:');
 async function install(client) {
  client.on(Events.GuildMemberAdd, member => send(member.guild, 'membro_entrada', embed('Entrada no servidor', `${member} entrou no servidor.`, COLORS.good)));
