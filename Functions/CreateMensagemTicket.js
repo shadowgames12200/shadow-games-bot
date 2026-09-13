@@ -1,166 +1,33 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder } = require("discord.js");
-const { tickets } = require("../DataBaseJson")
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { tickets } = require('../DataBaseJson');
 
+function buildPanel(guild) {
+  const functions = tickets.get('tickets.funcoes') || {};
+  const appearance = tickets.get('tickets.aparencia') || {};
+  const buttons = Object.entries(functions).slice(0, 5).map(([key, item]) => {
+    const button = new ButtonBuilder().setCustomId(`AbrirTicket_${key}`).setLabel(String(item.nome || key).slice(0, 80)).setStyle(ButtonStyle.Primary);
+    if (item.emoji) button.setEmoji(item.emoji);
+    return button;
+  });
+  const embed = new EmbedBuilder().setTitle(appearance.title || 'Atendimento').setDescription(appearance.description || 'Selecione uma opção para abrir seu atendimento.')
+    .setFooter({ text: guild.name, iconURL: guild.iconURL({ dynamic: true }) }).setTimestamp();
+  if (appearance.color) embed.setColor(appearance.color);
+  if (appearance.banner) embed.setImage(appearance.banner);
+  return { embeds: [embed], components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [] };
+}
 function CreateMessageTicket(interaction, channel, client) {
-
-    const ggg = tickets.get(`tickets.funcoes`)
-    const aparencia = tickets.get(`tickets.aparencia`)
-
-    const arrayDeValores = Object.values(ggg)
-    const button = new ButtonBuilder()
-        .setCustomId(`AbrirTicket_${arrayDeValores[0].nome}`)
-        .setLabel(arrayDeValores[0].nome)
-        .setStyle(2)
-
-    if (arrayDeValores[0].emoji !== undefined) {
-        button.setEmoji(arrayDeValores[0].emoji)
-    }
-
-    const buttonrow = new ActionRowBuilder().addComponents(button)
-
-
-
-
-
-    const selectMenuBuilder = new StringSelectMenuBuilder()
-        .setCustomId('abrirticket')
-        .setPlaceholder('Clique aqui para ver as opções');
-
-
-    for (const element in ggg) {
-        const item = ggg[element];
-
-        const option = {
-            label: `${item.nome}`,
-            description: `${item.descricao == undefined ? item.predescricao : item.descricao}`,
-            value: `${element}`,
-            ...item.emoji == undefined ? {} : { emoji: `${item.emoji}` }
-        }
-
-
-        selectMenuBuilder.addOptions(option);
-
-    }
-
-    const style2row = new ActionRowBuilder().addComponents(selectMenuBuilder);
-
-
-    const embed = new EmbedBuilder()
-        .setTitle(`${aparencia.title}`)
-        .setDescription(`${aparencia.description}`)
-        .setFooter(
-            { text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }
-        )
-        .setTimestamp()
-
-    if (aparencia.color !== undefined) {
-        embed.setColor(`${aparencia.color}`)
-    }
-
-    if (aparencia.banner !== undefined) {
-        embed.setImage(`${aparencia.banner}`)
-    }
-
-    const channel2 = client.channels.cache.get(channel)
-
-
-    if (Object.keys(ggg).length == 1) {
-        channel2.send({ components: [buttonrow], embeds: [embed] }).then(msg => {
-            tickets.push(`tickets.messageid`, { msgid: msg.id, channelid: msg.channel.id, guildid: msg.guild.id })
-        })
-    } else {
-        channel2.send({ components: [style2row], embeds: [embed] }).then(msg => {
-            tickets.push(`tickets.messageid`, { msgid: msg.id, channelid: msg.channel.id, guildid: msg.guild.id })
-        })
-    }
+  const channel2 = client.channels.cache.get(channel);
+  if (!channel2) return;
+  channel2.send(buildPanel(interaction.guild)).then(msg => tickets.push('tickets.messageid', { msgid: msg.id, channelid: msg.channel.id, guildid: msg.guild.id })).catch(() => {});
 }
-
 async function Checkarmensagensticket(client) {
-    const ggg = tickets.get(`tickets.funcoes`)
-
-    const aparencia = tickets.get(`tickets.aparencia`)
-    const item = tickets.get(`tickets.messageid`)
-    const guild = client.guilds.cache.get(item[0].guildid)
-
-    const arrayDeValores = Object.values(ggg)
-    const button = new ButtonBuilder()
-        .setCustomId(`AbrirTicket_${arrayDeValores[0].nome}`)
-        .setLabel(arrayDeValores[0].nome)
-        .setStyle(2)
-
-    if (arrayDeValores[0].emoji !== undefined) {
-        button.setEmoji(arrayDeValores[0].emoji)
-    }
-
-    const buttonrow = new ActionRowBuilder().addComponents(button)
-
-
-
-    const selectMenuBuilder = new StringSelectMenuBuilder()
-        .setCustomId('abrirticket')
-        .setPlaceholder('Clique aqui para ver as opções');
-
-
-    for (const element in ggg) {
-        const item = ggg[element];
-
-        const option = {
-            label: `${item.nome}`,
-            description: `${item.predescricao == undefined ? item.predescricao : item.predescricao}`,
-            value: `${element}`,
-            ...item.emoji == undefined ? {} : { emoji: `${item.emoji}` }
-        }
-
-
-        selectMenuBuilder.addOptions(option);
-
-    }
-
-    const style2row = new ActionRowBuilder().addComponents(selectMenuBuilder);
-
-
-    const embed = new EmbedBuilder()
-        .setTitle(`${aparencia.title}`)
-        .setDescription(`${aparencia.description}`)
-        .setFooter(
-            { text: guild.name, iconURL: guild.iconURL({ dynamic: true }) }
-        )
-        .setTimestamp()
-
-    if (aparencia.color !== undefined) {
-        embed.setColor(`${aparencia.color}`)
-    }
-
-    if (aparencia.banner !== undefined) {
-        embed.setImage(`${aparencia.banner}`)
-    }
-
-    for (const iterator in item) {
-        const element = item[iterator];
-
-        try {
-            const channel = await client.channels.cache.get(element.channelid)
-            const msg = await channel.messages.fetch(element.msgid)
-
-            if (Object.keys(ggg).length == 1) {
-                msg.edit({ components: [buttonrow], embeds: [embed] })
-            } else {
-                msg.edit({ components: [style2row], embeds: [embed] })
-            }
-        } catch (error) {
-
-        }
-
-
-    }
-
-
-
-
-
+  const items = tickets.get('tickets.messageid') || [];
+  for (const item of items) {
+    try {
+      const channel = await client.channels.fetch(item.channelid);
+      const msg = await channel.messages.fetch(item.msgid);
+      await msg.edit(buildPanel(channel.guild));
+    } catch (_) {}
+  }
 }
-
-module.exports = {
-    CreateMessageTicket,
-    Checkarmensagensticket
-}
+module.exports = { CreateMessageTicket, Checkarmensagensticket };
