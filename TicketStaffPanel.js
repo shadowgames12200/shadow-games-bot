@@ -47,7 +47,7 @@ function controlButtons(guildId) {
     notify: () => new ButtonBuilder().setCustomId('ticket_notify').setLabel('Notificar equipe').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
     claim: () => new ButtonBuilder().setCustomId('ticket_claim').setLabel('Assumir Ticket').setEmoji('🔒').setStyle(ButtonStyle.Primary),
     transcript: () => new ButtonBuilder().setCustomId('ticket_transcript').setLabel('Salvar transcript').setEmoji('📄').setStyle(ButtonStyle.Secondary),
-    close: () => new ButtonBuilder().setCustomId('ticket_close').setLabel('Deletar e Salvar').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
+    close: () => new ButtonBuilder().setCustomId('ticket_close').setLabel('Fechar e Salvar').setEmoji('🔒').setStyle(ButtonStyle.Danger)
   };
   const buttons = configuredButtons(guildId).filter(key => definitions[key]).map(key => definitions[key]());
   return buttons.length ? new ActionRowBuilder().addComponents(buttons) : null;

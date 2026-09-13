@@ -55,7 +55,7 @@ function ticketButtons(guildId) {
     notify: () => new ButtonBuilder().setCustomId('ticket_notify').setLabel('Notificar equipe').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
     claim: () => new ButtonBuilder().setCustomId('ticket_claim').setLabel('Assumir Ticket').setEmoji('🔒').setStyle(ButtonStyle.Primary),
     transcript: () => new ButtonBuilder().setCustomId('ticket_transcript').setLabel('Salvar transcript').setEmoji('📄').setStyle(ButtonStyle.Secondary),
-    close: () => new ButtonBuilder().setCustomId('ticket_close').setLabel('Deletar e Salvar').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
+    close: () => new ButtonBuilder().setCustomId('ticket_close').setLabel('Fechar e Salvar').setEmoji('🔒').setStyle(ButtonStyle.Danger)
   };
   const buttons = configured.filter(key => defs[key]).map(key => defs[key]());
   return buttons.length ? new ActionRowBuilder().addComponents(...buttons) : null;
@@ -253,10 +253,10 @@ async function closeTicket(interaction) {
   const info = topicInfo(interaction.channel), team = teamFor(info.team);
   if (!isStaff(interaction, team)) return interaction.reply({ content: '❌ Somente a equipe pode fechar este ticket.', ephemeral: true });
   await interaction.deferReply({ ephemeral: true });
-  const content = await transcript(interaction.channel), logId = transcriptChannelId(interaction.guild.id), log = logId ? await interaction.guild.channels.fetch(logId).catch(() => null) : null;
+  const content = await transcript(interaction.channel), transcriptName = `${interaction.channel.name}.txt`, makeTranscriptFile = () => new AttachmentBuilder(Buffer.from(content || 'Sem mensagens.'), { name: transcriptName }), logId = transcriptChannelId(interaction.guild.id), log = logId ? await interaction.guild.channels.fetch(logId).catch(() => null) : null;
   if (!log?.isTextBased()) return interaction.editReply({ content: '❌ Não foi possível fechar: configure um canal de transcript válido no /botconfig ticket.' });
   try {
-    await log.send({ content: `📁 Transcript obrigatório: **${interaction.channel.name}** por ${interaction.user}\nSolicitante: <@${info.userId}>`, files: [new AttachmentBuilder(Buffer.from(content || 'Sem mensagens.'), { name: `${interaction.channel.name}.txt` })] });
+    await log.send({ content: `📁 Transcript obrigatório: **${interaction.channel.name}** por ${interaction.user}\nSolicitante: <@${info.userId}>`, files: [makeTranscriptFile()] });
   } catch (error) {
     console.error('[TicketControlSuite] transcript before close failed', error);
     return interaction.editReply({ content: '❌ Não foi possível salvar o transcript. O ticket não foi excluído.' });
@@ -264,7 +264,7 @@ async function closeTicket(interaction) {
   if (slaTimers.has(interaction.channel.id)) { clearTimeout(slaTimers.get(interaction.channel.id)); slaTimers.delete(interaction.channel.id); }
   db.ticketStats ||= { opened: 0, closed: 0, ratings: [] }; db.ticketStats.closed = (db.ticketStats.closed || 0) + 1; save();
   const requester = await interaction.guild.members.fetch(info.userId).catch(() => null);
-  if (requester) requester.send({ content: 'Como foi o atendimento deste ticket?', components: [new ActionRowBuilder().addComponents(...[1,2,3,4,5].map(n => new ButtonBuilder().setCustomId(`ticket_rate_${n}`).setLabel(String(n)).setStyle(ButtonStyle.Secondary)))] }).catch(() => {});
+  if (requester) requester.send({ content: `📄 O transcript do seu ticket **${interaction.channel.name}** foi salvo.`, files: [makeTranscriptFile()], components: [new ActionRowBuilder().addComponents(...[1,2,3,4,5].map(n => new ButtonBuilder().setCustomId(`ticket_rate_${n}`).setLabel(String(n)).setStyle(ButtonStyle.Secondary)))] }).catch(error => console.error('[TicketControlSuite] requester transcript DM failed', error));
   await interaction.editReply({ content: '✅ Transcrição completa salva. O ticket será deletado em instantes.' });
   setTimeout(() => interaction.channel.delete('Ticket encerrado após salvar transcrição').catch(() => {}), 1500);
 }
@@ -361,4 +361,4 @@ async function install(client) {
     for (const id of targets) await message.channel.permissionOverwrites.edit(id, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }).catch(() => {});
   });
 }
-module.exports = { install, panel, adminPanel, ensure };
+module.exports = { install, panel, adminPanel, staffPanel, ensure };
