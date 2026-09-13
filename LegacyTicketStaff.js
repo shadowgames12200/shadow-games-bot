@@ -160,6 +160,36 @@ function publicPanel(interaction) {
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('abrirticket').setPlaceholder('Clique aqui para ver as opções').addOptions(entries.map(([key, item]) => ({ value: key, label: String(item.nome || key).slice(0, 100), description: String(item.descricao || item.predescricao || '').slice(0, 100), ...(item.emoji ? { emoji: item.emoji } : {}) }))))] };
 }
 
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
+
+async function buildTranscript(thread) {
+  const messages = await thread.messages.fetch({ limit: 100 });
+  const rows = [...messages.values()].reverse().map(message => {
+    const content = escapeHtml(message.cleanContent || '[anexo, imagem ou componente]');
+    const attachments = [...(message.attachments?.values?.() || [])].map(file => `<p><a href="${escapeHtml(file.url)}">📎 ${escapeHtml(file.name || 'Anexo')}</a></p>`).join('');
+    return `<article><div class="meta">${escapeHtml(message.author?.tag || 'Usuário')} · ${new Date(message.createdTimestamp).toLocaleString('pt-BR')}</div><div class="content">${content.replace(/\n/g, '<br>')}${attachments}</div></article>`;
+  }).join('\n');
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Transcript ${escapeHtml(thread.name)}</title><style>body{font-family:Arial,sans-serif;background:#f4f5f7;color:#202225;margin:0;padding:24px}.wrap{max-width:900px;margin:auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 10px #0001}h1{margin-top:0;color:#5865f2}.meta{font-size:12px;color:#68727d;margin-bottom:6px}.content{white-space:normal;line-height:1.45}article{border-top:1px solid #e5e7eb;padding:14px 0}</style></head><body><main class="wrap"><h1>Transcript do ticket</h1><p><b>Thread:</b> ${escapeHtml(thread.name)}<br><b>ID:</b> ${escapeHtml(thread.id)}<br><b>Gerado em:</b> ${escapeHtml(new Date().toLocaleString('pt-BR'))}</p>${rows || '<p>Ticket sem mensagens.</p>'}</main></body></html>`;
+  return { attachment: Buffer.from(html, 'utf8'), name: `transcript-${thread.id}.html` };
+}
+
+async function sendTranscript(interaction) {
+  const attachment = await buildTranscript(interaction.channel);
+  const c = config();
+  const owner = await interaction.client.users.fetch(threadOwner(interaction.channel)).catch(() => null);
+  const target = c.transcriptChannelId ? await interaction.client.channels.fetch(c.transcriptChannelId).catch(() => null) : null;
+  const sent = { channel: false, user: false };
+  if (target?.isTextBased?.()) {
+    await target.send({ content: `📄 Transcript do ticket **${interaction.channel.name}** fechado por ${interaction.user}.`, files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] }).then(() => { sent.channel = true; }).catch(error => console.error('[LegacyTicketStaff] transcript channel send failed', error));
+  }
+  if (owner) {
+    await owner.send({ content: `📄 Seu ticket foi encerrado. Segue o transcript do atendimento.`, files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] }).then(() => { sent.user = true; }).catch(error => console.error('[LegacyTicketStaff] transcript DM failed', error));
+  }
+  return { attachment, sent };
+}
+
 async function handle(interaction) {
   if (!interaction.guild || !isLegacyThread(interaction.channel)) return false;
   const id = interaction.customId || '';
@@ -178,17 +208,14 @@ async function handle(interaction) {
       return interaction.reply({ content: `✅ Ticket assumido por ${interaction.user}. Status: **${s.status}**.` });
     }
     if (id === 'ticket_transcript') {
-      const messages = await interaction.channel.messages.fetch({ limit: 100 });
-      const text = [...messages.values()].reverse().map(m => `[${new Date(m.createdTimestamp).toLocaleString('pt-BR')}] ${m.author?.tag || 'Usuário'}: ${m.cleanContent || '[anexo/componente]'}`).join('\n');
-      const attachment = { attachment: Buffer.from(text || 'Ticket sem mensagens.'), name: `transcript-${interaction.channel.id}.txt` };
-      const c = config();
-      const target = c.transcriptChannelId ? await interaction.client.channels.fetch(c.transcriptChannelId).catch(() => null) : null;
-      if (target?.isTextBased?.()) await target.send({ content: `📄 Transcript do ticket ${interaction.channel} salvo por ${interaction.user}.`, files: [attachment] });
-      return interaction.reply({ content: target ? '✅ Transcript enviado ao canal configurado.' : '✅ Transcript gerado nesta resposta.', files: target ? [] : [attachment], ephemeral: !target });
+      const result = await sendTranscript(interaction);
+      return interaction.reply({ content: `✅ Transcript HTML gerado.${result.sent.channel ? ' Enviado ao canal configurado.' : ''}${result.sent.user ? ' Enviado ao solicitante por DM.' : ' Não foi possível enviar DM ao solicitante.'}`, ephemeral: true });
     }
     if (id === 'ticket_close') {
-      await interaction.reply({ content: '✅ Ticket salvo. Esta thread será arquivada.' });
+      await interaction.deferReply({ ephemeral: true });
+      const result = await sendTranscript(interaction);
       saveState(interaction.channel, { status: 'resolvido' });
+      await interaction.editReply({ content: `✅ Ticket fechado e transcript HTML gerado.${result.sent.channel ? ' Enviado ao canal configurado.' : ''}${result.sent.user ? ' Enviado ao solicitante por DM.' : ' Não foi possível enviar DM ao solicitante.'}` });
       return interaction.channel.setArchived(true, `Fechado por ${interaction.user.tag}`).catch(() => {});
     }
   }
