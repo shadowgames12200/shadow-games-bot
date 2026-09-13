@@ -305,7 +305,10 @@ async function sendTranscript(interaction, finalized = false) {
   const card = closedTicketCard(interaction.channel, interaction.user, transcriptUrl);
   if (finalized && target?.isTextBased?.()) await target.send(card).catch(error => console.error('[LegacyTicketStaff] closing card channel send failed', error));
   if (owner) {
-    const payload = finalized ? (transcriptUrl ? card : { ...card, content: '📄 Seu ticket foi encerrado. O transcript está anexado abaixo.', files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] }) : { content: '📄 Transcript do atendimento.', files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] };
+    // O usuário recebe somente o cartão; o botão abre o HTML hospedado no canal de transcripts.
+    const payload = finalized
+      ? { ...card, content: transcriptUrl ? '📄 Seu ticket foi encerrado. Clique em **Abrir Transcript** para visualizar o atendimento no navegador.' : '📄 Seu ticket foi encerrado. O transcript não pôde receber um link porque o canal de transcripts não está configurado.' }
+      : { content: '📄 O transcript será disponibilizado no cartão final quando o ticket for encerrado.' };
     await owner.send(payload).then(() => { sent.user = true; }).catch(error => console.error('[LegacyTicketStaff] transcript DM failed', error));
   }
   return { attachment, sent, transcriptUrl };
