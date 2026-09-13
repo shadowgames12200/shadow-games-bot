@@ -10,6 +10,7 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 const { configuracao, estatisticas, tickets } = require('./DataBaseJson');
+const { owner: configuredOwnerId } = require('./config.json');
 const { createTicketFromModal } = require('./Functions/CreateTicket');
 
 const QUICK_REPLIES = {
@@ -61,12 +62,16 @@ function roleIds() {
   return [...new Set([
     configuracao.get('ConfigRoles.cargoadm'),
     configuracao.get('ConfigRoles.cargosup'),
+    configuracao.get('ConfigRoles.cargodono'),
     ...c.staffRoleIds
   ].filter(Boolean).map(String))];
 }
 
 function isStaff(interaction) {
+  const userId = String(interaction.user?.id || '');
+  const serverOwnerId = String(interaction.guild?.ownerId || configuredOwnerId || '');
   return Boolean(
+    userId && userId === serverOwnerId ||
     interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ||
     interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels) ||
     roleIds().some(id => interaction.member?.roles?.cache?.has(id))
