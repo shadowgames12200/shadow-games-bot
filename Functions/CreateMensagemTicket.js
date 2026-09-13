@@ -2,18 +2,19 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('
 const { tickets } = require('../DataBaseJson');
 
 function buildPanel(guild) {
-  const functions = tickets.get('tickets.funcoes') || {};
   const appearance = tickets.get('tickets.aparencia') || {};
-  const buttons = Object.entries(functions).slice(0, 5).map(([key, item]) => {
-    const button = new ButtonBuilder().setCustomId(`AbrirTicket_${key}`).setLabel(String(item.nome || key).slice(0, 80)).setStyle(ButtonStyle.Primary);
-    if (item.emoji) button.setEmoji(item.emoji);
-    return button;
-  });
-  const embed = new EmbedBuilder().setTitle(appearance.title || 'Atendimento').setDescription(appearance.description || 'Selecione uma opção para abrir seu atendimento.')
-    .setFooter({ text: guild.name, iconURL: guild.iconURL({ dynamic: true }) }).setTimestamp();
+  const buttons = [
+    new ButtonBuilder().setCustomId('AbrirTicket_Suporte ao Cliente').setLabel('Suporte ao Cliente').setEmoji('🛒').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('AbrirTicket_Dúvidas').setLabel('Dúvidas').setEmoji('❓').setStyle(ButtonStyle.Secondary)
+  ];
+  const embed = new EmbedBuilder()
+    .setTitle(appearance.title || 'Atendimento')
+    .setDescription(appearance.description || 'Selecione uma opção para abrir seu atendimento.')
+    .setFooter({ text: guild.name, iconURL: guild.iconURL({ dynamic: true }) })
+    .setTimestamp();
   if (appearance.color) embed.setColor(appearance.color);
   if (appearance.banner) embed.setImage(appearance.banner);
-  return { embeds: [embed], components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [] };
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(buttons)] };
 }
 function CreateMessageTicket(interaction, channel, client) {
   const channel2 = client.channels.cache.get(channel);
