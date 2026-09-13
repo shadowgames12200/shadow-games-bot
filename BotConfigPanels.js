@@ -109,12 +109,13 @@ async function syncTicketPanels(i) {
 }
 async function handle(i) {
   const id=i.customId||'';
-  const isTicketConfig = id.startsWith('bc_ticket_') || id.startsWith('bc_logs_');
+  const isTicketConfig = id.startsWith('bc_ticket_') || id.startsWith('bc_logs_') || id === 'bc_home_ticket' || id === 'bc_home_logs';
   if (!i.guild || (isTicketConfig && !owner(i))) {
     if (isTicketConfig && !i.replied && !i.deferred) await i.reply({ephemeral:true,content:'❌ Apenas administradores podem usar este painel.'});
     return false;
   }
   if (i.isButton?.()) {
+    if(id==='bc_home_ticket') return ticketHome(i); if(id==='bc_home_logs') return logsHome(i);
     if(id==='bc_ticket_access') return ticketModal(i,'access'); if(id==='bc_ticket_public') return ticketModal(i,'public'); if(id==='bc_ticket_internal') return ticketModal(i,'internal'); if(id==='bc_ticket_purchases') return ticketModal(i,'purchases'); if(id==='bc_ticket_channel') return i.reply({ephemeral:true,content:'Escolha o canal do painel público:',components:[row(new ChannelSelectMenuBuilder().setCustomId('bc_ticket_channel_select').setPlaceholder('Selecione um canal').setChannelTypes(ChannelType.GuildText))]}); if(id==='bc_ticket_post') return postTicket(i); if(id==='bc_ticket_sync') return syncTicketPanels(i); if(id==='bc_logs_select') return logEventMenu(i); if(id==='bc_logs_clear') return logEventMenu(i,true); if(id==='bc_logs_refresh') return logsHome(i);
   }
   if(i.isStringSelectMenu?.() && (id==='bc_logs_event'||id==='bc_logs_clear_event')) { const key=i.values[0]; if(id==='bc_logs_clear_event'){delete ensure(i.guild.id).logs.channels[key];save();return logsHome(i);} return i.reply({ephemeral:true,content:`Escolha o canal para **${LOG_EVENTS[key]}**:`,components:[row(new ChannelSelectMenuBuilder().setCustomId(`bc_logs_channel:${key}`).setPlaceholder('Selecione um canal').setChannelTypes(ChannelType.GuildText))]}); }
