@@ -1,0 +1,147 @@
+{
+    "c8ee93b6-80ee-42f3-bb10-2ca8620411c0": {
+        "produto": "💳 Central de Compras — SHADOW GAMES",
+        "campo": "🎮 Plano de 27000 jogos | R$ 300",
+        "quantidade": 1,
+        "valor": 300,
+        "data": 1781112403069,
+        "guild": "1506363355290402898",
+        "userid": "963038833199439892",
+        "id": "1514318934038544444",
+        "idpagamento": "Aprovado Manualmente"
+    },
+    "7616894e-750d-4a71-92b5-fe3222398a62": {
+        "produto": "💳 Central de Compras — SHADOW GAMES",
+        "campo": "🎮 Plano de 27000 jogos | R$ 300",
+        "quantidade": 1,
+        "valor": 300,
+        "data": 1781112459115,
+        "guild": "1506363355290402898",
+        "userid": "963038833199439892",
+        "id": "1514318934038544444",
+        "idpagamento": "Aprovado Manualmente"
+    },
+    "7a6d7bbe-d066-4c17-add4-4e990e87bf04": {
+        "produto": "📦Conta Rockstar",
+        "campo": "📦 Conta Rockstar",
+        "quantidade": 1,
+        "valor": 2.8,
+        "data": 1781417392930,
+        "guild": "1506363355290402898",
+        "userid": "836294871518150696",
+        "id": "1515592638621810769",
+        "idpagamento": "Aprovado Manualmente"
+    },
+    "dc827bb8-7bc9-4731-947e-28ddf4349709": {
+        "produto": "📦Conta Rockstar",
+        "campo": "📦 Conta Rockstar",
+        "quantidade": 1,
+        "valor": 2.8,
+        "data": 1781419858279,
+        "guild": "1506363355290402898",
+        "userid": "836294871518150696",
+        "id": "1515608949892710430",
+        "idpagamento": "Aprovado Manualmente"
+    },
+    "14ac164f-5993-4428-a70f-cea9b9b3a5db": {
+        "produto": "📦Conta Rockstar",
+        "campo": "📦 Conta Rockstar",
+        "quantidade": 1,
+        "valor": 1.512,
+        "cupomaplicado": "RSTAR_SG",
+        "data": 1781827532867,
+        "guild": "1506363355290402898",
+        "userid": "1304413613607485470",
+        "id": "1517318429907095713",
+        "idpagamento": "Aprovado Manualmente"
+    },
+    "6d76de65-17b3-4958-b6e3-b74b209d4223": {
+        "produto": "📦Conta Rockstar",
+        "campo": "📦 Conta Rockstar",
+        "quantidade": 1,
+        "valor": 1.512,
+        "cupomaplicado": "RSTAR_SG",
+        "data": 1782089614234,
+        "guild": "1506363355290402898",
+        "userid": "836294871518150696",
+        "id": "1518418306057502840",
+        "idpagamento": "Aprovado Manualmente"
+    },
+    "e215f495-884c-4681-b87d-c906296aec61": {
+        "produto": "📦Conta Rockstar",
+        "campo": "📦 Conta Rockstar",
+        "quantidade": 1,
+        "valor": 2.8,
+        "data": 1782091098836,
+        "guild": "1506363355290402898",
+        "userid": "836294871518150696",
+        "id": "1518424500465565726",
+        "idpagamento": "Aprovado Manualmente"
+    },
+    "2ea18d8e-375c-4194-85e1-9963bf8435dc": {
+        "produto": "📦Conta Rockstar",
+        "campo": "📦 Conta Rockstar",
+        "quantidade": 1,
+        "valor": 2.8,
+        "data": 1782096071531,
+        "guild": "1506363355290402898",
+        "userid": "836294871518150696",
+        "id": "1518445283233497188",
+        "idpagamento": 164421337079
+    },
+    "2abffe6a-f408-4314-b4c6-1dcf710ddb07": {
+        "produto": "📦Conta Rockstar",
+        "campo": "📦 Conta Rockstar",
+        "quantidade": 1,
+        "valor": 2.8,
+        "data": 1782100847995,
+        "guild": "1506363355290402898",
+        "userid": "1516994369247252622",
+        "id": "1518465621627633664",
+        "idpagamento": "Aprovado Manualmente"
+    },
+    "608261a7-1b5f-4597-b73a-de5b626bf13e": {
+        "produto": "💳 Central de Compras — SHADOW GAMES",
+        "campo": "🎮 Plano de 1071 jogos | R$ 180",
+        "quantidade": 1,
+        "valor": 180,
+        "data": 1782101674403,
+        "guild": "1506363355290402898",
+        "userid": "1281987278108885035",
+        "id": "1518469098307190904",
+        "idpagamento": "Aprovado Manualmente"
+    },
+    "7a2d755a-4e0d-40aa-a2f0-2a74151d9519": {
+        "produto": "💳 Central de Compras — SHADOW GAMES",
+        "campo": "🎮 Plano de 1071 jogos | R$ 180",
+        "quantidade": 1,
+        "valor": 180,
+        "data": 1782102024565,
+        "guild": "1506363355290402898",
+        "userid": "1281987278108885035",
+        "id": "1518470581480067233",
+        "idpagamento": "Aprovado Manualmente"
+    },
+    "8c73e36d-77cc-4ecd-b6c1-3a9e40a5e9d0": {
+        "produto": "💳 Central de Compras — SHADOW GAMES",
+        "campo": "🎮 Plano de 1071 jogos | R$ 180",
+        "quantidade": 1,
+        "valor": 180,
+        "data": 1782102206661,
+        "guild": "1506363355290402898",
+        "userid": "1281987278108885035",
+        "id": "1518470967108833402",
+        "idpagamento": 164425791683
+    },
+    "5d1af983-6ffe-46b9-9b6f-1878ee6423c5": {
+        "produto": "gta v instalavel",
+        "campo": "comprar",
+        "quantidade": 1,
+        "valor": 5,
+        "data": 1782171735570,
+        "guild": "1506363355290402898",
+        "userid": "1063137338923941949",
+        "id": "1518762920291340372",
+        "idpagamento": 165374913670
+    }
+}

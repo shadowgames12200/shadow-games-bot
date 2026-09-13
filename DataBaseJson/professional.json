@@ -1,0 +1,67 @@
+{
+  "settings": {
+    "logChannelId": "",
+    "starboardChannelId": "",
+    "starboardThreshold": 3,
+    "suggestionChannelId": "",
+    "welcomeChannelId": "",
+    "goodbyeChannelId": "",
+    "ticketCategoryId": "",
+    "ticketTeamRoleId": "",
+    "inactivityHours": 72,
+    "slaHours": 24,
+    "dashboardPort": 8787,
+    "backupRetention": 14
+  },
+  "reactionRoles": {},
+  "customCommands": {},
+  "teams": {},
+  "forms": {},
+  "permissions": {
+    "closeTicket": [],
+    "claimTicket": [],
+    "moderateSuggestions": [],
+    "viewTranscripts": [],
+    "manageAutoMod": []
+  },
+  "starboard": {},
+  "suggestions": {},
+  "tickets": {},
+  "transcripts": {},
+  "supportMetrics": {
+    "firstResponseMs": [],
+    "resolutionMs": [],
+    "byTeam": {},
+    "byAgent": {}
+  },
+  "stats": {
+    "opened": 0,
+    "closed": 0,
+    "byTeam": {},
+    "byAgent": {},
+    "totalMessages": 0
+  },
+  "automod": {
+    "enabled": true,
+    "blockedWords": [],
+    "maxMentions": 5,
+    "maxLinksPerMessage": 3,
+    "spamWindowSeconds": 10,
+    "spamMaxMessages": 6,
+    "inviteLinks": true,
+    "exemptions": {
+      "channels": [],
+      "roles": []
+    },
+    "punish": "timeout"
+  },
+  "audit": {
+    "events": [],
+    "max": 1000
+  },
+  "warnings": {
+    "g": {
+      "u": []
+    }
+  }
+}
