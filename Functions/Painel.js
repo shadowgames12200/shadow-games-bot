@@ -1,6 +1,5 @@
 const { EmbedBuilder, ApplicationCommandType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { produtos, configuracao } = require("../DataBaseJson");
-const { ticketHome, logsHome } = require("../BotConfigPanels");
 const startTime = Date.now();
 const maxMemory = 100;
 const usedMemory = process.memoryUsage().heapUsed / 1024 / 1024;
@@ -33,15 +32,10 @@ async function Painel(interaction, client) {
     new ButtonBuilder().setCustomId("gerenciarconfigs").setLabel('Definições').setEmoji(`1178066377014255828`).setStyle(2).setDisabled(false),
   );
 
-  const row4 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("botconfig_ticket_home").setLabel('Sistema de Ticket').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("botconfig_logs_home").setLabel('Sistema de Logs').setStyle(ButtonStyle.Secondary),
-  );
-
   if (interaction.message == undefined) {
-    return interaction.reply({ content: ``, components: [row2, row3, row4], embeds: [embed], ephemeral: true });
+    return interaction.reply({ content: ``, components: [row2, row3], embeds: [embed], ephemeral: true });
   }
-  return interaction.update({ content: ``, components: [row2, row3, row4], embeds: [embed], ephemeral: true });
+  return interaction.update({ content: ``, components: [row2, row3], embeds: [embed], ephemeral: true });
 }
 
 async function Gerenciar2(interaction, client) {
