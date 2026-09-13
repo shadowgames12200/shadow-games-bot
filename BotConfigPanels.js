@@ -4,6 +4,8 @@ const {
   ChannelSelectMenuBuilder, ChannelType, StringSelectMenuBuilder
 } = require('discord.js');
 const { db, save } = require('./ProfessionalSuite');
+const { tickets } = require('./DataBaseJson');
+const { publicPanel } = require('./LegacyTicketStaff');
 
 const LOG_EVENTS = {
   member_join: 'Entrada no servidor', member_leave: 'Saída do servidor', ban: 'Banimento', unban: 'Desbanimento',
@@ -88,8 +90,8 @@ async function postTicket(i) {
   if (!c.public.channelId) return i.reply({ ephemeral: true, content: '❌ Primeiro configure um canal para o painel público.' });
   const ch = i.guild.channels.cache.get(c.public.channelId);
   if (!ch?.isTextBased()) return i.reply({ ephemeral: true, content: '❌ Canal inválido.' });
-  await ch.send(ticketPublicPayload(i.guild, c));
-  return i.reply({ ephemeral: true, content: `✅ Painel publicado em ${ch}.` });
+  await ch.send(publicPanel(i));
+  return i.reply({ ephemeral: true, content: `✅ Painel antigo de threads publicado em ${ch}.` });
 }
 async function syncTicketPanels(i) {
   await i.deferReply({ ephemeral: true });
@@ -127,6 +129,10 @@ async function handle(i) {
     const v = x => i.fields.getTextInputValue(x).trim();
     if (id === 'bc_ticket_access_save') {
       db.ticketConfig.assumeRoleIds = v('assumeRoles').replace(/[^0-9,]/g, '').split(',').map(x => x.trim()).filter(Boolean);
+      const legacy = tickets.get('tickets.staffConfig') || {};
+      legacy.staffRoleIds = db.ticketConfig.assumeRoleIds;
+      legacy.transcriptChannelId = v('transcriptChannel').replace(/[^0-9]/g, '');
+      tickets.set('tickets.staffConfig', legacy);
       for (const item of v('categoryRoles').split(';').map(x => x.trim()).filter(Boolean)) {
         const [key, ids] = item.split(':');
         if (db.ticketConfig.teams[key]) db.ticketConfig.teams[key].roleIds = (ids || '').split('|').map(x => x.replace(/[^0-9]/g, '')).filter(Boolean);
@@ -147,6 +153,10 @@ async function handle(i) {
       c.ticket.internal.title = v('title') || c.ticket.internal.title;
       c.ticket.internal.description = v('description') || c.ticket.internal.description;
       c.ticket.internal.buttons = v('buttons').split(',').map(x => x.trim()).filter(Boolean);
+      const legacy = tickets.get('tickets.staffConfig') || {};
+      legacy.title = c.ticket.internal.title;
+      legacy.description = c.ticket.internal.description;
+      tickets.set('tickets.staffConfig', legacy);
     }
     if (id === 'bc_ticket_purchase_save') {
       c.ticket.purchases.title = v('title') || c.ticket.purchases.title;
