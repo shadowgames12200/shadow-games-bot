@@ -1,4 +1,34 @@
-const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
-const { sendPanel, cfg } = require('../../TicketPanelSuite');
-const data = new SlashCommandBuilder().setName('painel-ticket').setDescription('Configura o painel de atendimento').setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild.bitfield).addSubcommand(s=>s.setName('enviar').setDescription('Envia o painel neste canal').addChannelOption(o=>o.setName('canal').setDescription('Canal onde o painel será enviado').addChannelTypes(ChannelType.GuildText).setRequired(true)).addChannelOption(o=>o.setName('categoria').setDescription('Categoria para criar os tickets').addChannelTypes(ChannelType.GuildCategory)).addStringOption(o=>o.setName('titulo').setDescription('Título do painel')).addStringOption(o=>o.setName('descricao').setDescription('Descrição do painel')).addStringOption(o=>o.setName('cor').setDescription('Cor hexadecimal, exemplo #7c3aed'))).addSubcommand(s=>s.setName('status').setDescription('Mostra a configuração atual'));
-module.exports={name:'painel-ticket',data,run:async(_client,interaction)=>{if(!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)&&!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator))return interaction.reply({content:'❌ Você precisa de Gerenciar Servidor.',ephemeral:true});const c=cfg(interaction.guild.id);if(interaction.options.getSubcommand()==='status')return interaction.reply({content:`📋 **Painel:** ${c.title}\n**Descrição:** ${c.description}\n**Canal:** ${c.panelChannelId?`<#${c.panelChannelId}>`:'não configurado'}\n**Categoria:** ${c.categoryId?`<#${c.categoryId}>`:'não configurada'}`,ephemeral:true});const channel=interaction.options.getChannel('canal');const category=interaction.options.getChannel('categoria');const options={};for(const key of ['titulo','descricao','cor']){const value=interaction.options.getString(key);if(value)options[{titulo:'title',descricao:'description',cor:'color'}[key]]=value;}if(category)options.categoryId=category.id;await sendPanel(interaction.guild,channel,options);return interaction.reply({content:`✅ Painel enviado em ${channel}.\nUse os botões para abrir Suporte, Financeiro, Vendas ou Parceria.`,ephemeral:true});}};
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { publicPanel, config } = require('../../LegacyTicketStaff');
+
+const data = new SlashCommandBuilder()
+  .setName('painel-ticket')
+  .setDescription('Configura o painel público de atendimento')
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild.bitfield)
+  .addSubcommand(command => command
+    .setName('enviar')
+    .setDescription('Envia o painel público neste canal'))
+  .addSubcommand(command => command
+    .setName('status')
+    .setDescription('Mostra a configuração atual do painel'));
+
+module.exports = {
+  name: 'painel-ticket',
+  data,
+  run: async (_client, interaction) => {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) &&
+        !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: '❌ Você precisa de Gerenciar Servidor.', ephemeral: true });
+    }
+
+    if (interaction.options.getSubcommand() === 'status') {
+      const current = config();
+      return interaction.reply({
+        content: `📋 **Painel:** ${current.title}\n**Descrição:** ${current.description}`,
+        ephemeral: true
+      });
+    }
+
+    return interaction.reply(publicPanel(interaction));
+  }
+};
