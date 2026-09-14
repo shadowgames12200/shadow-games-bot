@@ -7,6 +7,7 @@ const { install: installGovernance } = require('./GovernanceSuite');
 const { install: installProduction } = require('./ProductionSuite');
 const { install: installSecurity } = require('./SecuritySuite');
 const { install: installLogs } = require('./LogSuite');
+const { install: installLegacyTicketStaff } = require('./LegacyTicketStaff');
 const { ensure: ensurePayments } = require('./PaymentProviders');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.DirectMessages] });
 const estatisticasNodeInstance = require('./Functions/VariaveisEstatisticas');
@@ -31,4 +32,3 @@ if (!token) throw new Error('Defina DISCORD_TOKEN no ambiente antes de iniciar o
 client.login(token);
 process.on('unhandledRejection', reason => console.error('🚫 Promise rejeitada:', reason));
 process.on('uncaughtException', error => console.error('🚫 Exceção não tratada:', error));
-const { install: installLegacyTicketStaff } = require('./LegacyTicketStaff');
