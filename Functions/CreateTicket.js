@@ -20,8 +20,8 @@ function openForm(valor) {
   const support = formKind(valor) === 'support';
   const modal = new ModalBuilder().setCustomId(formCustomId(valor)).setTitle(support ? 'Suporte ao Cliente' : 'Dúvidas');
   const fields = support ? [
-    ['ticket_order', 'ID ou nome do pedido', 'Ex.: 123456 ou Plano de jogos', true],
-    ['ticket_customer', 'Nome do cliente ou usuário', 'Informe seu nome ou usuário', true],
+    ['ticket_customer', 'Nome', 'Informe seu nome ou usuário', true],
+    ['ticket_order', 'Nome ou ID do produto', 'Ex.: 123456 ou Plano de jogos', true],
     ['ticket_description', 'Descrição', 'Explique detalhadamente o que aconteceu', true]
   ] : [
     ['ticket_customer', 'Nome do cliente ou usuário', 'Informe seu nome ou usuário', true],
@@ -46,14 +46,23 @@ function purchaseList(userId, guildId) {
 function purchasePanel(userId, guildId) {
   const list = purchaseList(userId, guildId);
   if (!list.length) return [];
-  return [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_purchase_link').setPlaceholder('Selecionar compra').addOptions(list.map((p, i) => ({ value: String(p.key), label: `${i + 1}. ${String(p.produto || 'Produto').slice(0, 80)}`, description: `Pedido ${p.idpagamento || p.key}`.slice(0, 100) })))))];
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId('ticket_purchase_link')
+    .setPlaceholder('Selecionar compra')
+    .addOptions(list.map((p, i) => ({
+      value: String(p.key),
+      label: `${i + 1}. ${String(p.produto || 'Produto').slice(0, 80)}`,
+      description: `Pedido ${p.idpagamento || p.key}`.slice(0, 100)
+    })));
+  return [new ActionRowBuilder().addComponents(menu)];
 }
+
 function clientPanel(isSupport, userId, guildId) {
   const options = new StringSelectMenuBuilder().setCustomId('ticket_client_options').setPlaceholder('Opções');
   options.addOptions(
     { label: 'Informar pagamento', description: 'Avisar a equipe sobre um pagamento', value: 'payment', emoji: '💳' },
     { label: 'Atualização do pedido', description: 'Solicitar atualização do atendimento', value: 'update', emoji: '📦' },
-    { label: 'Enviar outra informação', description: 'Adicionar uma informação ao ticket', value: 'info', emoji: '📝' },
+    { label: 'Enviar outra informação', description: 'Adicionar uma informação no ticket', value: 'info', emoji: '📝' },
     { label: 'Adicionar membro', description: 'Solicitar a entrada de outra pessoa', value: 'add_member', emoji: '👤' }
   );
   const rows = [new ActionRowBuilder().addComponents(options)];
