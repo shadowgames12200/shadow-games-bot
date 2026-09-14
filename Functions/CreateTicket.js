@@ -34,32 +34,19 @@ function openForm(valor) {
 }
 
 async function CreateTicket(interaction, valor) {
-  if (!interaction.isButton?.() && !interaction.isStringSelectMenu?.() && !interaction.isSelectMenu?.()) return;
-  return interaction.showModal(openForm(valor));
+  if (!interaction.isButton?.() || !String(interaction.customId || '').startsWith('AbrirTicket_')) return false;
+  await interaction.showModal(openForm(valor || String(interaction.customId).replace('AbrirTicket_', '')));
+  return true;
 }
 
-function valueOf(fields, id) {
-  try { return String(fields.getTextInputValue(id) || '').trim(); } catch (_) { return ''; }
-}
+function valueOf(fields, id) { return fields.getTextInputValue(id).trim(); }
 function purchaseList(userId, guildId) {
-  return estatisticas.fetchAll().map(item => ({ key: item.ID, ...item.data }))
-    .filter(item => String(item.userid) === String(userId) && (!item.guild || String(item.guild) === String(guildId)))
-    .slice(0, 25);
+  return estatisticas.fetchAll().map(item => ({ key: item.ID, ...item.data })).filter(item => String(item.userid) === String(userId) && (!item.guildid || String(item.guildid) === String(guildId))).slice(0, 25);
 }
 function purchasePanel(userId, guildId) {
   const list = purchaseList(userId, guildId);
-  const menu = new StringSelectMenuBuilder().setCustomId('ticket_client_purchase').setPlaceholder(list.length ? 'Selecione uma compra' : 'Nenhuma compra encontrada').setDisabled(!list.length);
-  if (list.length) menu.addOptions(list.map((p, i) => ({
-    value: String(p.key),
-    label: String(p.campo || p.produto || `Compra ${i + 1}`).slice(0, 100),
-    description: `Qtd: ${p.quantidade || 1} • Valor: R$ ${Number(p.valor || 0).toFixed(2)}`.slice(0, 100)
-  })));
-  else menu.addOptions({ value: 'none', label: 'Nenhuma compra encontrada', description: 'Não há compras registradas para este usuário', emoji: '📭' });
-  const button = new ButtonBuilder().setCustomId('ticket_not_product').setLabel('Não é sobre um produto adquirido').setEmoji('🆘').setStyle(ButtonStyle.Secondary);
-  return [
-    new ActionRowBuilder().addComponents(menu),
-    new ActionRowBuilder().addComponents(button)
-  ];
+  if (!list.length) return [];
+  return [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_purchase_link').setPlaceholder('Selecionar compra').addOptions(list.map((p, i) => ({ value: String(p.key), label: `${i + 1}. ${String(p.produto || 'Produto').slice(0, 80)}`, description: `Pedido ${p.idpagamento || p.key}`.slice(0, 100) })))))];
 }
 function clientPanel(isSupport, userId, guildId) {
   const options = new StringSelectMenuBuilder().setCustomId('ticket_client_options').setPlaceholder('Opções');
@@ -79,7 +66,6 @@ function purchasesEmbed(userId, guildId) {
     .setDescription(list.length ? 'Selecione abaixo a compra relacionada a este atendimento. O menu mostra nome, quantidade e valor.' : 'Nenhuma compra encontrada para este usuário.')
     .setColor('#5865f2');
 }
-
 async function createTicketFromModal(interaction) {
   const support = interaction.customId === `${FORM_PREFIX}support`;
   const cooldown = aberturaCooldown.get(interaction.user.id) || 0;
@@ -88,8 +74,10 @@ async function createTicketFromModal(interaction) {
   await interaction.deferReply({ ephemeral: true });
   const functions = tickets.get('tickets.funcoes') || {};
   const entry = Object.entries(functions).find(([key, item]) => support ? isSupportType(item?.nome || key) : !isSupportType(item?.nome || key));
-  const [key, ggg] = entry || [];
-  if (!ggg) return interaction.editReply({ content: '❌ Esta opção de ticket não está configurada.' });
+  const fallback = support
+    ? ['Suporte ao Cliente', { nome: 'Suporte ao Cliente', descricao: 'Atendimento sobre compras, pagamentos, pedidos ou produtos.' }]
+    : ['Dúvidas', { nome: 'Dúvidas', descricao: 'Perguntas sobre produtos, serviços, valores ou funcionamento da loja.' }];
+  const [key, ggg] = entry || fallback;
   const existing = interaction.channel.threads.cache.find(x => x.name.includes(interaction.user.id));
   if (existing) {
     const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${existing.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
@@ -124,5 +112,4 @@ async function createTicketFromModal(interaction) {
   const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${thread.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
   return interaction.editReply({ content: '✅ Ticket criado com sucesso!', components: [row] });
 }
-
 module.exports = { CreateTicket, createTicketFromModal, formCustomId, isSupportType };
