@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const inFlight = new Map();
+const queues = new Map();
 const metrics = {
   startedAt: Date.now(),
   interactions: 0,
@@ -53,6 +54,25 @@ function once(key, ttlMs = 15000) {
 
 function release(key) { inFlight.delete(key); }
 
+
+function runLimited(task, key = 'default', limit = 2) {
+  const state = queues.get(key) || { active: 0, pending: [] };
+  queues.set(key, state);
+  return new Promise((resolve, reject) => {
+    const start = () => {
+      state.active++;
+      Promise.resolve().then(task).then(resolve, reject).finally(() => {
+        state.active--;
+        const next = state.pending.shift();
+        if (next) next();
+        else if (state.active === 0) queues.delete(key);
+      });
+    };
+    if (state.active < Math.max(1, Number(limit) || 1)) start();
+    else state.pending.push(start);
+  });
+}
+
 function recordError(error, context = {}) {
   metrics.lastErrorAt = new Date().toISOString();
   metrics.lastError = { message: error?.message || String(error), code: error?.code || null, context };
@@ -81,4 +101,4 @@ function backupJson(sourceFile, backupDir, keep = 7) {
   return target;
 }
 
-module.exports = { metrics, timeout, withTimeout, once, release, recordError, installProcessHandlers, snapshot, backupJson };
+module.exports = { metrics, timeout, withTimeout, once, release, runLimited, recordError, installProcessHandlers, snapshot, backupJson };
