@@ -202,12 +202,13 @@ module.exports = {
 
             if (interaction.customId == 'confirmarpagamentomanual') {
 
+                await interaction.deferReply({ ephemeral: true })
                 const perm = await getPermissions(interaction.user.id)
                 if (perm === null || !perm.includes(interaction.user.id)) {
-                    return interaction.reply({ content: `❌ | Você não possui permissão para usar esse comando.`, ephemeral: true });
+                    return interaction.editReply({ content: `❌ | Você não possui permissão para usar esse comando.` });
                 }
 
-                if (carrinhos.has(interaction.channel.id) == false) return interaction.reply({ content: `❌ Não há um carrinho aberto neste canal.`, ephemeral: true })
+                if (carrinhos.has(interaction.channel.id) == false) return interaction.editReply({ content: `❌ Não há um carrinho aberto neste canal.` })
 
                 interaction.message.delete()
 
@@ -281,7 +282,7 @@ module.exports = {
                 }
 
                 pagamentos.set(`${interaction.channel.id}`, { pagamentos: { id: `Aprovado Manualmente`, method: `pix`, data: Date.now() } })
-                interaction.reply({ content: `✅ Pagamento aprovado manualmente. Aguarde..`, ephemeral: true })
+                interaction.editReply({ content: `✅ Pagamento aprovado manualmente. Aguarde..` })
 
             }
 
