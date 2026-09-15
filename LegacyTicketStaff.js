@@ -11,7 +11,7 @@ const {
 } = require('discord.js');
 const { configuracao, estatisticas, tickets } = require('./DataBaseJson');
 const { owner: configuredOwnerId } = require('./config.json');
-const { createTicketFromModal } = require('./Functions/CreateTicket');
+const { createTicketFromModal, CreateTicket } = require('./Functions/CreateTicket');
 
 const QUICK_REPLIES = {
   pagamento: 'Olá! Vou verificar o pagamento e retorno com uma atualização em breve.',
@@ -320,6 +320,7 @@ async function sendTranscript(interaction, finalized = false) {
 }
 
 async function handle(interaction) {
+  if (interaction.isStringSelectMenu?.() && interaction.customId === 'ticket_public_options') return CreateTicket(interaction, interaction.values[0]);
   if (interaction.isModalSubmit?.() && interaction.customId?.startsWith('ticket_open_form_')) return createTicketFromModal(interaction);
   if (interaction.isButton?.() && interaction.customId?.startsWith('ticket_rating_')) return handleRating(interaction);
   if (interaction.isButton?.() || interaction.isStringSelectMenu?.() || interaction.isModalSubmit?.()) {
