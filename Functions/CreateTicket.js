@@ -1,31 +1,21 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, PermissionFlagsBits } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 
-const { configuracao, tickets, estatisticas } = require('../DataBaseJson');
+const { tickets, estatisticas } = require('../DataBaseJson');
 
-const aberturaCooldown = new Map();
+const PREFIX = 'ticket_open_form_';
 
-const FORM_PREFIX = 'ticket_open_form_';
+const support = v => /suporte|cliente|compra|pedido/i.test(String(v || ''));
 
-function normalize(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+function form(v) { const is = support(v); const m = new ModalBuilder().setCustomId(PREFIX + (is ? 'support' : 'doubt')).setTitle(is ? 'Suporte ao Cliente' : 'Dúvidas'); const a = (id,label,placeholder,style=TextInputStyle.Short) => new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId(id).setLabel(label).setPlaceholder(placeholder).setStyle(style).setRequired(true)); m.addComponents(a('ticket_customer','Nome','Informe seu nome ou usuário')); if (is) m.addComponents(a('ticket_order','Nome ou ID do produto','Ex.: 123456 ou Plano de jogos')); m.addComponents(a('ticket_description','Descrição','Explique detalhadamente o que aconteceu',TextInputStyle.Paragraph)); return m; }
 
-function isSupportType(value) { const text = normalize(value); return text.includes('suporte') || text.includes('cliente') || text.includes('pedido') || text.includes('compra'); }
+async function CreateTicket(interaction, valor) { const id=String(interaction.customId||''); if (interaction.isStringSelectMenu?.() && id==='ticket_public_options') { await interaction.showModal(form(interaction.values[0])); return true; } if (interaction.isButton?.() && id.startsWith('AbrirTicket_')) { await interaction.showModal(form(id.slice(12))); return true; } return false; }
 
-function formKind(value) { return isSupportType(value) ? 'support' : 'doubt'; }
+function compras(userId) { return estatisticas.fetchAll().map(x=>({key:x.ID,...x.data})).filter(x=>String(x.userid)===String(userId)).slice(0,25); }
 
-function formCustomId(value) { return `${FORM_PREFIX}${formKind(value)}`; }
+function comprasMenu(userId) { const list=compras(userId); if(!list.length) return []; return [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_purchase_link').setPlaceholder('Selecionar compra').addOptions(list.map((x,i)=>({value:String(x.key),label:`${i+1}. ${String(x.produto||'Produto').slice(0,90)}`,description:`Pedido ${x.idpagamento||x.key}`.slice(0,100)}))))]; }
 
-function openForm(valor) { const support = formKind(valor) === 'support'; const modal = new ModalBuilder().setCustomId(formCustomId(valor)).setTitle(support ? 'Suporte ao Cliente' : 'Dúvidas'); const fields = support ? [['ticket_customer','Nome','Informe seu nome ou usuário',true],['ticket_order','Nome ou ID do produto','Ex.: 123456 ou Plano de jogos',true],['ticket_description','Descrição','Explique detalhadamente o que aconteceu',true]] : [['ticket_customer','Nome do cliente ou usuário','Informe seu nome ou usuário',true],['ticket_description','Descrição','Escreva sua dúvida',true]]; modal.addComponents(fields.map(([id,label,placeholder,required]) => new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId(id).setLabel(label).setPlaceholder(placeholder).setStyle(id === 'ticket_description' ? TextInputStyle.Paragraph : TextInputStyle.Short).setRequired(required).setMaxLength(id === 'ticket_description' ? 1000 : 100)))); return modal; }
+function opcoes() { return [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_client_options').setPlaceholder('Opções').addOptions({value:'payment',label:'Informar pagamento',emoji:'💳'},{value:'update',label:'Atualização do pedido',emoji:'📦'},{value:'info',label:'Enviar outra informação',emoji:'📝'}))]; }
 
-async function CreateTicket(interaction, valor) { const customId = String(interaction.customId || ''); const isButtonOpen = interaction.isButton?.() && customId.startsWith('AbrirTicket_'); const isMenuOpen = interaction.isStringSelectMenu?.() && customId === 'ticket_public_options'; if (!isButtonOpen && !isMenuOpen) return false; const selected = isMenuOpen ? interaction.values?.[0] : customId.replace('AbrirTicket_', ''); await interaction.showModal(openForm(valor || selected)); return true; }
+function comprasEmbed(userId) { return new EmbedBuilder().setTitle('🛍️ Compras encontradas').setDescription(compras(userId).length ? 'Selecione abaixo a compra relacionada a este atendimento.' : 'Nenhuma compra encontrada para este usuário.').setColor('#5865f2'); }
 
-function valueOf(fields,id) { return fields.getTextInputValue(id).trim(); }
-
-function purchaseList(userId,guildId) { return estatisticas.fetchAll().map(item => ({ key:item.ID, ...item.data })).filter(item => String(item.userid) === String(userId) && (!item.guildid || String(item.guildid) === String(guildId))).slice(0,25); }
-
-function purchasePanel(userId,guildId) { const list = purchaseList(userId,guildId); if (!list.length) return []; const menu = new StringSelectMenuBuilder().setCustomId('ticket_purchase_link').setPlaceholder('Selecionar compra').addOptions(list.map((p,i) => ({ value:String(p.key), label:`${i+1}. ${String(p.produto || 'Produto').slice(0,80)}`, description:`Pedido ${p.idpagamento || p.key}`.slice(0,100) }))); return [new ActionRowBuilder().addComponents(menu)]; }
-
-function clientPanel(isSupport,userId,guildId) { const options = new StringSelectMenuBuilder().setCustomId('ticket_client_options').setPlaceholder('Opções').addOptions({label:'Informar pagamento',description:'Avisar a equipe sobre um pagamento',value:'payment',emoji:'💳'},{label:'Atualização do pedido',description:'Solicitar atualização do atendimento',value:'update',emoji:'📦'},{label:'Enviar outra informação',description:'Adicionar uma informação no ticket',value:'info',emoji:'📝'},{label:'Adicionar membro',description:'Solicitar a entrada de outra pessoa',value:'add_member',emoji:'👤'}); return [new ActionRowBuilder().addComponents(options)]; }
-
-function purchasesEmbed(userId,guildId) { const list = purchaseList(userId,guildId); return new EmbedBuilder().setTitle('🛍️ Compras encontradas').setDescription(list.length ? 'Selecione abaixo a compra relacionada a este atendimento.' : 'Nenhuma compra encontrada para este usuário.').setColor('#5865f2'); }
-
-async function createTicketFromModal(interaction) { const support = interaction.customId === `${FORM_PREFIX}support`; const cooldown = aberturaCooldown.get(interaction.user.id) || 0; if (Date.now()-cooldown < 30000) return interaction.reply({content:'⏳ Aguarde alguns segundos antes de abrir outro ticket.',ephemeral:true}); aberturaCooldown.set(interaction.user.id,Date.now()); await interaction.deferReply({ephemeral:true}); const functions = tickets.get('tickets.funcoes') || {}; const entry = O
+module.exports = { CreateTicket, form, comprasMenu, comprasEmbed, opcoes };
