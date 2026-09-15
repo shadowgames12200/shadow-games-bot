@@ -11,6 +11,7 @@ const { DentroCarrinho1, DentroCarrinho2, DentroCarrinhoPix } = require("../../F
 const { VerificarCupom, AplicarCupom } = require("../../Functions/VerificarCupom");
 const { getPermissions } = require("../../Functions/PermissionsCache.js");
 const db = new QuickDB();
+const { once, release, withTimeout } = require('../../Lib/Resilience');
 
 
 module.exports = {
@@ -203,12 +204,14 @@ module.exports = {
             if (interaction.customId == 'confirmarpagamentomanual') {
 
                 await interaction.deferReply({ ephemeral: true })
+                const actionKey = `manual-payment:${interaction.guildId}:${interaction.channelId}`;
+                if (!once(actionKey, 30000)) return interaction.editReply({ content: '⏳ Este pagamento já está sendo processado. Aguarde um instante.' });
                 const perm = await getPermissions(interaction.user.id)
                 if (perm === null || !perm.includes(interaction.user.id)) {
-                    return interaction.editReply({ content: `❌ | Você não possui permissão para usar esse comando.` });
+                    release(actionKey); return interaction.editReply({ content: `❌ | Você não possui permissão para usar esse comando.` });
                 }
 
-                if (carrinhos.has(interaction.channel.id) == false) return interaction.editReply({ content: `❌ Não há um carrinho aberto neste canal.` })
+                if (carrinhos.has(interaction.channel.id) == false) { release(actionKey); return interaction.editReply({ content: `❌ Não há um carrinho aberto neste canal.` }); }
 
                 interaction.message.delete()
 
@@ -282,7 +285,7 @@ module.exports = {
                 }
 
                 pagamentos.set(`${interaction.channel.id}`, { pagamentos: { id: `Aprovado Manualmente`, method: `pix`, data: Date.now() } })
-                interaction.editReply({ content: `✅ Pagamento aprovado manualmente. Aguarde..` })
+                release(actionKey); interaction.editReply({ content: `✅ Pagamento aprovado manualmente. Aguarde..` })
 
             }
 
