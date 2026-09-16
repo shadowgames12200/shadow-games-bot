@@ -320,6 +320,7 @@ async function sendTranscript(interaction, finalized = false) {
 }
 
 async function handle(interaction) {
+  if (interaction.isButton?.() && String(interaction.customId || '').startsWith('AbrirTicket_')) return await CreateTicket(interaction, String(interaction.customId).replace('AbrirTicket_', ''));
   if (interaction.isStringSelectMenu?.() && interaction.customId === 'ticket_public_options') return await CreateTicket(interaction, interaction.values[0]);
   if (interaction.isModalSubmit?.() && interaction.customId?.startsWith('ticket_open_form_')) return await createTicketFromModal(interaction);
   if (interaction.isButton?.() && interaction.customId?.startsWith('ticket_rating_')) return handleRating(interaction);
