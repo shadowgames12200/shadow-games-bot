@@ -53,7 +53,9 @@ async function Gerenciar2(interaction, client) {
     new ButtonBuilder().setCustomId("gerenciarposicao").setLabel('Posições').setEmoji(`1178086608004722689`).setStyle(1),
   );
   const row3 = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("voltar00").setLabel('Voltar').setEmoji(`1178068047202893869`).setStyle(2));
-  await interaction.update({ embeds: [embed], components: [row2, row3], content: `` });
+  const payload = { embeds: [embed], components: [row2, row3], content: `` };
+  if (interaction.deferred || interaction.replied) return interaction.editReply(payload);
+  return interaction.update(payload);
 }
 
 module.exports = { Painel, Gerenciar2 };
