@@ -10,7 +10,13 @@ const { install: installLogs } = require('./LogSuite');
 const { install: installLegacyTicketStaff } = require('./LegacyTicketStaff');
 const { ensure: ensurePayments } = require('./PaymentProviders');
 const { installProcessHandlers, recordError } = require('./Lib/Resilience');
+const { installInteractionGuard, wrapInteractionHandler } = require('./Lib/InteractionGuard');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.DirectMessages] });
+const originalClientOn = client.on.bind(client);
+client.on = (event, listener) => originalClientOn(
+  event,
+  event === 'interactionCreate' && !listener.__interactionGuard ? wrapInteractionHandler(listener) : listener,
+);
 const estatisticasNodeInstance = require('./Functions/VariaveisEstatisticas');
 const EstatisticasNode = new estatisticasNodeInstance();
 module.exports = { EstatisticasNode };
@@ -24,6 +30,7 @@ async function start() {
   client.slashCommands = new Collection();
   slash.run(client);
   events.run(client);
+  installInteractionGuard(client);
   installProcessHandlers(client);
   installProfessionalSuite(client);
   installGovernance(client);
