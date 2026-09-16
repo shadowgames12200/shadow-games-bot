@@ -76,13 +76,14 @@ function purchasesEmbed(userId, guildId) {
     .setColor('#5865f2');
 }
 async function createTicketFromModal(interaction) {
-  const support = interaction.customId === `${FORM_PREFIX}support`;
+  const formSupport = interaction.customId === `${FORM_PREFIX}support`;
   const cooldown = aberturaCooldown.get(interaction.user.id) || 0;
   if (Date.now() - cooldown < 30000) return interaction.reply({ content: '⏳ Aguarde alguns segundos antes de abrir outro ticket.', ephemeral: true });
   aberturaCooldown.set(interaction.user.id, Date.now());
   await interaction.deferReply({ ephemeral: true });
   const functions = tickets.get('tickets.funcoes') || {};
-  const entry = Object.entries(functions).find(([key, item]) => support ? isSupportType(item?.nome || key) : !isSupportType(item?.nome || key));
+  const entry = Object.entries(functions).find(([key, item]) => formSupport ? isSupportType(item?.nome || key) : !isSupportType(item?.nome || key));
+  const support = formSupport && Boolean(entry && isSupportType(entry[1]?.nome || entry[0]));
   const fallback = support
     ? ['Suporte ao Cliente', { nome: 'Suporte ao Cliente', descricao: 'Atendimento sobre compras, pagamentos, pedidos ou produtos.' }]
     : ['Dúvidas', { nome: 'Dúvidas', descricao: 'Perguntas sobre produtos, serviços, valores ou funcionamento da loja.' }];
