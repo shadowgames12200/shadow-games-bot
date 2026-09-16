@@ -81,7 +81,7 @@ module.exports = {
 
                 await carrinhos.set(`${interaction.channel.id}.quantidadeselecionada`, qtd)
 
-                DentroCarrinho1(interaction, 1)
+                return await DentroCarrinho1(interaction, 1)
 
             }
         }
@@ -96,21 +96,21 @@ module.exports = {
 
             if (interaction.customId == 'codigocopiaecola') {
                 const yy = await carrinhos.get(interaction.channel.id)
-                interaction.reply({ content: `${yy.pagamentos.cp}`, ephemeral: true })
+                return await interaction.reply({ content: `${yy.pagamentos.cp}`, ephemeral: true })
 
             }
 
             if (interaction.customId == 'pagarpix') {
-                DentroCarrinhoPix(interaction, client)
+                return await DentroCarrinhoPix(interaction, client)
             }
 
             if (interaction.customId == 'voltarcarrinho') {
-                DentroCarrinho1(interaction, 1)
+                return await DentroCarrinho1(interaction, 1)
             }
 
             if (interaction.customId == 'irparapagamento') {
                 if (configuracao.get(`pagamentos.SemiAutomatico.status`) == true) {
-                    interaction.deferUpdate()
+                    await interaction.deferUpdate()
                     await interaction.message.edit({ content: `Espere um momento...`, components: [], embeds: [] })
 
                     const pagamento = configuracao.get(`pagamentos.SemiAutomatico`)
@@ -193,10 +193,10 @@ module.exports = {
                     await interaction.message.edit({ content: ``, embeds: [embed], components: [row3], files: [attachment] })
                     await interaction.channel.send({ content: `|| <@&1270059315381927996> || ${interaction.user} ${pagamento.msg}` })
 
-                    interaction.channel.setName(`➕・${interaction.user.username}・${interaction.user.id}`)
+                    await interaction.channel.setName(`➕・${interaction.user.username}・${interaction.user.id}`)
 
                 } else {
-                    DentroCarrinho2(interaction)
+                    return await DentroCarrinho2(interaction)
                 }
 
             }
@@ -495,11 +495,11 @@ module.exports = {
                 if (temCargo == false) return interaction.reply({ content: `❌ Você não possui permissão para comprar esse produto!`, ephemeral: true })
             }
 
-            if (verify.status == 202) {
+            if (verify.status === 202) {
 
 
 
-                CreateCarrinho(interaction, infos)
+                return await CreateCarrinho(interaction, infos)
 
 
 

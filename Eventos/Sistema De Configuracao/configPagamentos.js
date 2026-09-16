@@ -372,23 +372,7 @@ module.exports = {
                         transaction_amount: parseFloat(amount), // Use a variável 'amount' aqui
                         description: 'Testando se o token é Válido | Node Applications',
                         payment_method_id: 'pix',
-                        payer: {
-                            email: 'nodeappsrecebimentos@gmail.com',
-                            first_name: 'Victor André',
-                            last_name: 'Ricardo Almeida',
-                            identification: {
-                                type: 'CPF',
-                                number: '15084299872',
-                            },
-                            address: {
-                                zip_code: '86063190',
-                                street_name: 'Rua Jácomo Piccinin',
-                                street_number: '971',
-                                neighborhood: 'Pinheiros',
-                                city: 'Londrina',
-                                federal_unit: 'PR',
-                            },
-                        },
+                        payer: { email: 'token-validation@users.invalid' },
                     };
 
                     mercadopago.configurations.setAccessToken(tokenMP);
