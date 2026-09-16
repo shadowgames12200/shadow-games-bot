@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const { withTimeout, snapshot, backupJson, recordError, once, release, runLimited } = require('./Lib/Resilience');
+const { mirrorDocument } = require('./DatabasePostgres');
 const {
   Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
   ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits
@@ -20,7 +21,7 @@ const DEFAULTS = {
 function clone(v) { return JSON.parse(JSON.stringify(v)); }
 function load() { try { return { ...clone(DEFAULTS), ...JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) }; } catch { fs.mkdirSync(DATA_DIR, { recursive: true }); save(clone(DEFAULTS)); return clone(DEFAULTS); } }
 let db;
-function save(next = db) { db = next; fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2)); }
+function save(next = db) { db = next; fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2)); mirrorDocument('professional', db); }
 let saveTimer = null;
 function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { save(); } catch (error) { console.error('[ProfessionalSuite] Falha ao persistir alterações:', error); } }, 250); }
 db = load();
