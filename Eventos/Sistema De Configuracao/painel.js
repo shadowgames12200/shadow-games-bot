@@ -32,7 +32,7 @@ module.exports = {
                 NOME = NOME.replace('.', '');
                 PREDESC = PREDESC.replace('.', '');
 
-                if (tickets.get(`tickets.funcoes.${NOME}`) !== null) {
+                if (tickets.has(`tickets.funcoes.${NOME}`)) {
                     return interaction.reply({ content: `❌ | Já existe uma função com esse nome!`, ephemeral: true });
                 }
 
@@ -59,8 +59,7 @@ module.exports = {
                 if (BANNER !== '') {
                     const urlRegex = /^(ftp|http|https):\/\/[^ "]+$/;
                     if (!urlRegex.test(BANNER)) {
-                        tickets.set(`tickets.funcoes.${NOME}.banner`, BANNER)
-                        return interaction.reply({ message: dd, content: `❌ | Você escolheu incorretamente a URL do banner!`, ephemeral: true });
+                        return interaction.reply({ content: `❌ | Você escolheu incorretamente a URL do banner!`, ephemeral: true });
                     } else {
                         tickets.set(`tickets.funcoes.${NOME}.banner`, BANNER)
                     }
@@ -347,11 +346,14 @@ module.exports = {
             }
 
             if (interaction.customId == 'deletarticketsfunction') {
-                const valordelete = interaction.values
+                const valordelete = interaction.values || []
+                if (valordelete.length === 0) {
+                    return interaction.reply({ content: `❌ Selecione pelo menos uma função para remover.`, ephemeral: true });
+                }
                 for (const iterator of valordelete) {
                     tickets.delete(`tickets.funcoes.${iterator}`)
                 }
-                painelTicket(interaction)
+                return await painelTicket(interaction)
             }
 
 
@@ -546,7 +548,7 @@ module.exports = {
                     const selectMenuBuilder = new Discord.StringSelectMenuBuilder()
                         .setCustomId('deletarticketsfunction')
                         .setPlaceholder('Clique aqui para selecionar')
-                        .setMinValues(0)
+                        .setMinValues(1)
 
                     for (const chave in ggg) {
                         const item = ggg[chave];
@@ -562,7 +564,7 @@ module.exports = {
 
                     }
 
-                    selectMenuBuilder.setMaxValues(Object.keys(ggg).length)
+                    selectMenuBuilder.setMaxValues(Math.min(Object.keys(ggg).length, 25))
 
                     const style2row = new ActionRowBuilder().addComponents(selectMenuBuilder);
                     try {
