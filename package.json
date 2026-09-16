@@ -3,7 +3,9 @@
   "version": "2.0.0",
   "private": true,
   "main": "index.js",
-  "scripts": { "start": "node index.js" },
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
     "@discordjs/voice": "^0.16.0",
     "axios": "^1.4.0",
@@ -16,10 +18,11 @@
     "moment": "^2.30.1",
     "mp-webhook-portable": "^1.2.8",
     "node-fetch": "^3.3.2",
+    "pg": "^8.23.0",
+    "qr-code-styling-node": "^1.5.0",
     "qrcode": "^1.5.3",
     "qrcode-pix": "^5.0.0",
     "quick.db": "^9.1.6",
-    "qr-code-styling-node": "^1.5.0",
     "wio.db": "^4.0.22"
   }
 }

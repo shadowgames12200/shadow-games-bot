@@ -6,8 +6,9 @@ Este pacote adiciona os recursos pedidos ao bot existente: **reaction roles, sta
 
 1. Instale as dependências com `npm install`.
 2. Defina os segredos fora do código: `DISCORD_TOKEN=seu_token MP_ACCESS_TOKEN=seu_token_mp npm start`.
-3. Ative no Developer Portal os intents **Guild Members**, **Message Content** e **Message Reactions**.
-4. Inicie o bot com `npm start`.
+3. Para usar o PostgreSQL, defina `DATABASE_URL` com a Session Pooler do Supabase; o bot cria a tabela `bot_documents` e importa os JSON na primeira inicialização. Sem essa variável, ele mantém o fallback local.
+4. Ative no Developer Portal os intents **Guild Members**, **Message Content** e **Message Reactions**.
+5. Inicie o bot com `npm start`.
 
 O token que veio no projeto anterior foi removido do arquivo de configuração por segurança. Como ele foi exposto no pacote anterior, gere um novo token no Developer Portal antes de colocar o bot em produção.
 
