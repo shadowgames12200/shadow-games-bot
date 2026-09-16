@@ -1112,7 +1112,7 @@ module.exports = {
             if (interaction.customId.startsWith('painelconfigvendas')) {
 
 
-                Gerenciar2(interaction, client)
+                return await Gerenciar2(interaction, client)
 
 
 
