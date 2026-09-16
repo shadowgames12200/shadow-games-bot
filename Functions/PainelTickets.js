@@ -113,7 +113,9 @@ async function painelTicket(interaction) {
                 .setStyle(2)
         )
 
-    await interaction.update({ content: ``, embeds: [embed], components: [row2, row3, row4] })
+    const payload = { content: ``, embeds: [embed], components: [row2, row3, row4] };
+    if (interaction.deferred || interaction.replied) return interaction.editReply(payload);
+    return interaction.update(payload);
 }
 
 
