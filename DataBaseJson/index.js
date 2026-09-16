@@ -1,57 +1,12 @@
-const {
-  JsonDatabase,
-} = require("wio.db");
+const { createDatabase } = require('../DatabasePostgres');
 
-const produtos = new JsonDatabase({
-  databasePath: "./DataBaseJson/produtos.json"
-});
+const produtos = createDatabase('produtos');
+const carrinhos = createDatabase('carrinhos');
+const pagamentos = createDatabase('pagamentos');
+const pedidos = createDatabase('pedidos');
+const estatisticas = createDatabase('estatisticas');
+const avaliacoes = createDatabase('avaliacoes');
+const configuracao = createDatabase('configuracao');
+const tickets = createDatabase('tickets');
 
-
-const carrinhos = new JsonDatabase({
-  databasePath: "./DataBaseJson/carrinhos.json"
-});
-
-const pagamentos = new JsonDatabase({
-  databasePath: "./DataBaseJson/pagamentos.json"
-});
-
-const pedidos = new JsonDatabase({
-  databasePath: "./DataBaseJson/pedidos.json"
-});
-
-const estatisticas = new JsonDatabase({
-  databasePath: "./DataBaseJson/estatisticas.json"
-});
-
-const avaliacoes = new JsonDatabase({
-  databasePath: "./DataBaseJson/avaliacoes.json"
-});
-
-const configuracao = new JsonDatabase({
-  databasePath: "./DataBaseJson/configuracao.json"
-});
-
-const tickets = new JsonDatabase({
-  databasePath: "./DataBaseJson/tickets.json"
-});
-
-
-
-
-
-
-
-
-
-
-
-module.exports = {
-  produtos,
-  carrinhos,
-  pagamentos,
-  pedidos,
-  configuracao,
-  estatisticas,
-  avaliacoes,
-  tickets
-}
+module.exports = { produtos, carrinhos, pagamentos, pedidos, configuracao, estatisticas, avaliacoes, tickets };
