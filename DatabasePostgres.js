@@ -17,18 +17,19 @@ function readJson(file) {
   catch { return {}; }
 }
 
+const names = ['produtos', 'carrinhos', 'pagamentos', 'pedidos', 'configuracao', 'estatisticas', 'avaliacoes', 'tickets', 'permissions', 'refounds', 'professional'];
+function loadLocal() {
+  for (const name of names) {
+    if (!namespaces.has(name) || !Object.keys(namespaces.get(name) || {}).length) {
+      namespaces.set(name, readJson(path.join(DATA_DIR, `${name}.json`)));
+    }
+  }
+}
+
 async function initialize() {
   if (ready) return;
   if (initializing) return initializing;
   initializing = (async () => {
-    const names = ['produtos', 'carrinhos', 'pagamentos', 'pedidos', 'configuracao', 'estatisticas', 'avaliacoes', 'tickets', 'permissions', 'refounds', 'professional'];
-    const loadLocal = () => {
-      for (const name of names) {
-        if (!namespaces.has(name) || !Object.keys(namespaces.get(name) || {}).length) {
-          namespaces.set(name, readJson(path.join(DATA_DIR, `${name}.json`)));
-        }
-      }
-    };
     if (!process.env.DATABASE_URL) {
       loadLocal();
       ready = true;
