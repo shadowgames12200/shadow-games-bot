@@ -28,7 +28,7 @@ async function painelTicket(interaction) {
 
     const funcoes = tickets.get(`tickets.funcoes`);
 
-    if(funcoes !== null){
+    if (funcoes && typeof funcoes === 'object' && !Array.isArray(funcoes)) {
 
     let count = 0;
     let maxItems = 4;
