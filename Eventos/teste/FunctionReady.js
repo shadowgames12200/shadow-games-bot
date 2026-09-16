@@ -96,6 +96,6 @@ module.exports = {
         console.log(`${client.user.tag} Foi iniciado \n - Atualmente ${client.guilds.cache.size} servidores!\n - Tendo acesso a ${client.channels.cache.size} canais!\n - Contendo ${client.guilds.cache.reduce((a, b) => a + b.memberCount, 0)} usuarios!`)
 
         await CheckPosition(client).catch((error) => console.error('[CheckPosition]', error))
-        await carregarCache().catch((error) => console.error('[carregarCache]', error))
+        carregarCache()
     }
 }
