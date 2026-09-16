@@ -53,23 +53,7 @@ module.exports = {
           transaction_amount: Number(valor),
           description: `Pagamento - ${produto}`,
           payment_method_id: 'pix',
-          payer: {
-            email: `${interaction.user.id}@gmail.com`,
-            first_name: `Victor André`,
-            last_name: `Ricardo Almeida`,
-            identification: {
-              type: 'CPF',
-              number: '15084299872'
-            },
-            address: {
-              zip_code: '86063190',
-              street_name: 'Rua Jácomo Piccinin',
-              street_number: '971',
-              neighborhood: 'Pinheiros',
-              city: 'Londrina',
-              federal_unit: 'PR'
-            }
-          }
+            payer: { email: `${interaction.user.id}@users.invalid` }
         };
 
         mercadopago.configurations.setAccessToken(process.env.MP_ACCESS_TOKEN || configuracao.get('pagamentos.MpAPI'));
