@@ -39,7 +39,8 @@ async function Painel(interaction, client) {
 }
 
 async function Gerenciar2(interaction, client) {
-  const ggg = produtos.valueArray();
+  const productData = typeof produtos.all === 'function' ? produtos.all() : {};
+  const ggg = Array.isArray(productData) ? productData : Object.values(productData || {});
   const embed = new EmbedBuilder()
     .setColor(`${configuracao.get(`Cores.Principal`) == null ? '0cd4cc' : configuracao.get('Cores.Principal')}`)
     .setTitle(`Painel de Administração`)

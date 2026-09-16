@@ -9,17 +9,21 @@ async function painelTicket(interaction) {
         .setTimestamp()
 
 
-    if (tickets.get(`tickets.aparencia.title`) !== null) {
-        embed.setTitle(tickets.get(`tickets.aparencia.title`))
+    const title = tickets.get(`tickets.aparencia.title`);
+    const description = tickets.get(`tickets.aparencia.description`);
+    const color = tickets.get(`tickets.aparencia.color`);
+    const banner = tickets.get(`tickets.aparencia.banner`);
+    if (title != null && title !== '') {
+        embed.setTitle(title)
     }
-    if (tickets.get(`tickets.aparencia.description`) !== null) {
-        embed.setDescription(tickets.get(`tickets.aparencia.description`))
+    if (description != null && description !== '') {
+        embed.setDescription(description)
     }
-    if (tickets.get(`tickets.aparencia.color`) !== null) {
-        embed.setColor(tickets.get(`tickets.aparencia.color`))
+    if (color != null && color !== '') {
+        embed.setColor(color)
     }
-    if (tickets.get(`tickets.aparencia.banner`) !== null) {
-        embed.setImage(tickets.get(`tickets.aparencia.banner`))
+    if (banner != null && banner !== '') {
+        embed.setImage(banner)
     }
 
     const funcoes = tickets.get(`tickets.funcoes`);
