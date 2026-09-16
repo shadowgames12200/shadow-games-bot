@@ -63,6 +63,7 @@ function installInteractionGuard(client, { timeoutMs = 2500 } = {}) {
   const guard = interaction => {
     
     if (!isAckable(interaction)) return;
+    if (String(interaction.customId || '').startsWith('AbrirTicket_')) return;
     
     const fast = fastAck(interaction);
     
