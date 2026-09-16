@@ -7,8 +7,8 @@ const db = new QuickDB();
 
 
 async function DentroCarrinhoPix(interaction, client) {
-    interaction.deferUpdate()
-    await interaction.message.edit({ content: `🔄 Aguarde...`, ephemeral: true, components: [] }).then(async tt => {
+    await interaction.deferUpdate()
+    const tt = await interaction.message.edit({ content: `🔄 Aguarde...`, components: [] });
 
 
 
@@ -37,24 +37,7 @@ async function DentroCarrinhoPix(interaction, client) {
             transaction_amount: Number(aaaa),
             description: `Pagamento - ${interaction.user.username}`,
             payment_method_id: 'pix',
-            payer: {
-                email: `${interaction.user.id}@gmail.com`,
-                first_name: `Victor André`,
-                last_name: `Ricardo Almeida`,
-                identification: {
-                    type: 'CPF',
-                    number: '15084299872'
-                },
-
-                address: {
-                    zip_code: '86063190',
-                    street_name: 'Rua Jácomo Piccinin',
-                    street_number: '971',
-                    neighborhood: 'Pinheiros',
-                    city: 'Londrina',
-                    federal_unit: 'PR'
-                }
-            }
+            payer: { email: `${interaction.user.id}@users.invalid` }
         }
         mercadopago.configurations.setAccessToken(process.env.MP_ACCESS_TOKEN || configuracao.get('pagamentos.MpAPI'));
         await mercadopago.payment.create(payment_data)
@@ -104,7 +87,7 @@ async function DentroCarrinhoPix(interaction, client) {
 
                 await tt.edit({ embeds: [embed], files: [attachment], content: ``, components: [row3] })
 
-                interaction.channel.setName(`💱・${yy.user.username}・${yy.user.id}`)
+                await interaction.channel.setName(`💱・${yy.user.username}・${yy.user.id}`)
 
 
                 const mandanopvdocara = new EmbedBuilder()
@@ -183,10 +166,9 @@ async function DentroCarrinhoPix(interaction, client) {
                 interaction.followUp({ content: `❌ | Ocorreu um erro ao criar o pagamento, tente novamente.\nError: ${error}`, ephemeral: true })
             })
 
-    })
 }
 
-function DentroCarrinho2(interaction) {
+async function DentroCarrinho2(interaction) {
 
     const yd = carrinhos.get(interaction.channel.id)
 
@@ -196,7 +178,7 @@ function DentroCarrinho2(interaction) {
 
     if (yd.quantidadeselecionada > gggaaa.condicao?.valormaximo) return interaction.reply({ content: `❌ | Você não pode comprar mais de \`${gggaaa.condicao.valormaximo}x ${yd.infos.produto} - ${yd.infos.campo}\``, ephemeral: true })
     if (yd.quantidadeselecionada < gggaaa.condicao?.valorminimo) return interaction.reply({ content: `❌ | Você não pode comprar mais de \`${gggaaa.condicao.valorminimo}x ${yd.infos.produto} - ${yd.infos.campo}\``, ephemeral: true })
-    interaction.deferUpdate()
+    await interaction.deferUpdate()
 
     // content: `Selecione uma forma de pagamento.`
 
@@ -220,7 +202,7 @@ function DentroCarrinho2(interaction) {
                 .setStyle(2)
         )
 
-    interaction.message.edit({ content: `Selecione uma forma de pagamento.`, components: [row3], embeds: [] })
+    await interaction.message.edit({ content: `Selecione uma forma de pagamento.`, components: [row3], embeds: [] })
 }
 
 async function DentroCarrinho1(thread, status) {
@@ -335,11 +317,11 @@ async function DentroCarrinho1(thread, status) {
         )
 
     if (status == 1) {
-        thread.deferUpdate()
-        thread.message.edit({ content: `<@${ggg.user.id}>`, embeds: [embed], components: [row2] })
+        await thread.deferUpdate()
+        await thread.message.edit({ content: `<@${ggg.user.id}>`, embeds: [embed], components: [row2] })
 
     } else {
-        thread.send({ content: `<@${ggg.user.id}>`, embeds: [embed], components: [row2] })
+        await thread.send({ content: `<@${ggg.user.id}>`, embeds: [embed], components: [row2] })
     }
 
 }

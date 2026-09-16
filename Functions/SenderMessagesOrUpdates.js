@@ -11,7 +11,7 @@ const Entrega2 = configuracao.get(`Emojis_EntregAuto`)
 
 
 let msg = ``
-if (Entrega2 !== null) {
+if (Array.isArray(Entrega2)) {
     Entrega2.sort((a, b) => {
         const numA = parseInt(a.name.replace('ea', ''), 10);
         const numB = parseInt(b.name.replace('ea', ''), 10);

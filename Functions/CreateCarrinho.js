@@ -11,7 +11,8 @@ function VerificaçõesCarrinho(infos) {
 
 
 async function CreateCarrinho(interaction, infos) {
-    await interaction.reply({ content: `🔄 Aguarde...`, ephemeral: true }).then(async msg => {
+    await interaction.reply({ content: `🔄 Aguarde...`, ephemeral: true });
+    const msg = await interaction.fetchReply();
         const thread2222 = interaction.channel.threads.cache.find(x => x.name === `🛒・${interaction.user.username}・${interaction.user.id}`);
         if (thread2222 !== undefined) {
             const row4 = new ActionRowBuilder()
@@ -22,7 +23,7 @@ async function CreateCarrinho(interaction, infos) {
                         .setStyle(5)
                 )
 
-            interaction.editReply({ content: `❌ Você já possuí um carrinho aberto.`, components: [row4] })
+            await interaction.editReply({ content: `❌ Você já possuí um carrinho aberto.`, components: [row4] })
             return
         }
 
@@ -43,15 +44,12 @@ async function CreateCarrinho(interaction, infos) {
                     .setStyle(5)
             )
 
-        msg.edit({ content: `✅ Carrinho criado!`, components: [row4] })
+        await msg.edit({ content: `✅ Carrinho criado!`, components: [row4] })
 
 
         await carrinhos.set(thread.id, { user: interaction.user, guild: interaction.guild, threadid: thread.id, infos: infos })
 
-        DentroCarrinho1(thread)
-
-
-    })
+        await DentroCarrinho1(thread)
 
 
 
