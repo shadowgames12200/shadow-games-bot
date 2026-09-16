@@ -928,7 +928,7 @@ module.exports = {
             if (interaction.customId.startsWith('painelconfigticket')) {
 
 
-                painelTicket(interaction)
+                return await painelTicket(interaction)
 
 
             }
