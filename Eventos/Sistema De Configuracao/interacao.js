@@ -374,7 +374,10 @@ module.exports = {
         let currentSelectMenuBuilder;
 
         
-        for (const gggg of ggg) {
+        for (const entry of ggg) {
+
+            const [productId, productValue] = Array.isArray(entry) ? entry : [entry?.ID, entry];
+            const gggg = productValue?.data ? productValue : (productValue || {});
 
             let aaaaaa;
 
@@ -398,7 +401,7 @@ module.exports = {
             const option = {
                 label: `${name}`,
                 description: `${aaaaaa}`,
-                value: gggg.ID,
+                value: `${productId ?? gggg.ID ?? ''}`,
                 emoji: "1178163524443316285",
             }
             
@@ -616,7 +619,6 @@ module.exports = {
 
 
 // 🔄 Aguarde...
-
 
 
 
