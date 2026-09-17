@@ -35,7 +35,7 @@ function openForm(valor) {
 
 async function CreateTicket(interaction, valor) {
   const isButton = interaction.isButton?.() && String(interaction.customId || '').startsWith('AbrirTicket_');
-  const isLegacySelect = interaction.isStringSelectMenu?.() && interaction.customId === 'abrirticket';
+  const isLegacySelect = (interaction.isStringSelectMenu?.() || interaction.isSelectMenu?.()) && interaction.customId === 'abrirticket';
   if (!isButton && !isLegacySelect) return false;
   const functionKey = String(valor || (isLegacySelect ? interaction.values?.[0] : String(interaction.customId).replace('AbrirTicket_', '')) || '').trim();
   const functions = tickets.get('tickets.funcoes') || {};
