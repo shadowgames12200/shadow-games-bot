@@ -415,7 +415,7 @@ module.exports = {
             if (interaction.customId === 'vercompras') {
                 const ownerId = interaction.channel.ownerId || interaction.channel.name.split('・').pop();
                 const compras = estatisticas.fetchAll()
-                    .map(item => ({ key: item.ID, ...item.data }))
+                    .map(([key, data]) => ({ key, ...(data || {}) }))
                     .filter(item => item && String(item.userid) === String(ownerId))
                     .sort((a, b) => Number(b.data || 0) - Number(a.data || 0));
 

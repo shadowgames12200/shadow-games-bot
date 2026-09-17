@@ -35,49 +35,62 @@ function openForm(valor) {
 
 async function CreateTicket(interaction, valor) {
   const isButton = interaction.isButton?.() && String(interaction.customId || '').startsWith('AbrirTicket_');
-  const isLegacySelect = (interaction.isStringSelectMenu?.() || interaction.isSelectMenu?.()) && interaction.customId === 'abrirticket';
-  if (!isButton && !isLegacySelect) return false;
-  const functionKey = String(valor || (isLegacySelect ? interaction.values?.[0] : String(interaction.customId).replace('AbrirTicket_', '')) || '').trim();
+  const isSelect = (interaction.isStringSelectMenu?.() || interaction.isSelectMenu?.()) && (interaction.customId === 'abrirticket' || interaction.customId === 'ticket_public_options');
+  if (!isButton && !isSelect) return false;
+  const rawValue = String(valor || (isSelect ? interaction.values?.[0] : String(interaction.customId).replace('AbrirTicket_', '')) || '').trim();
   const functions = tickets.get('tickets.funcoes') || {};
-  const direct = functions[functionKey] ? [functionKey, functions[functionKey]] : null;
-  const byName = Object.entries(functions).find(([key, item]) => String(item?.nome || '').trim() === functionKey);
-  const entry = direct || byName;
-  if (!entry || !entry[1] || !Object.keys(entry[1]).length) return interaction.reply({ content: '❌ Essa função de ticket não existe mais. Publique o painel novamente.', ephemeral: true });
-  const [resolvedKey, ggg] = entry;
+  const entry = functions[rawValue] ? [rawValue, functions[rawValue]] : Object.entries(functions).find(([key, item]) => String(item?.nome || key).trim() === rawValue);
+  const resolvedKey = entry?.[0] || rawValue;
+  const ggg = entry?.[1] || tickets.get(`tickets.funcoes.${rawValue}`);
+  if (!ggg || !Object.keys(ggg).length) return interaction.reply({ content: '❌ | Essa função não existe!', ephemeral: true });
   const support = isSupportType(ggg.nome || resolvedKey);
-  const cooldown = aberturaCooldown.get(interaction.user.id) || 0;
-  if (Date.now() - cooldown < 30000) return interaction.reply({ content: '⏳ Aguarde alguns segundos antes de abrir outro ticket.', ephemeral: true });
+  const last = aberturaCooldown.get(interaction.user.id) || 0;
+  if (Date.now() - last < 30000) return interaction.reply({ content: '⏳ | Aguarde alguns segundos antes de abrir outro ticket.', ephemeral: true });
   aberturaCooldown.set(interaction.user.id, Date.now());
+  await interaction.reply({ content: '🔄 | Aguarde estamos criando seu Ticket!', ephemeral: true });
   const existing = interaction.channel.threads.cache.find(x => x.name.includes(interaction.user.id));
   if (existing) {
     const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${existing.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
-    return interaction.reply({ content: '❌ Você já possui um ticket aberto.', components: [row], ephemeral: true });
+    return interaction.editReply({ content: '❌ Você já possuí um ticket aberto.', components: [row] });
   }
-  await interaction.reply({ content: '🔄 Aguarde, estamos criando seu ticket.', ephemeral: true });
   const thread = await interaction.channel.threads.create({
-    name: `${functionKey}・${interaction.user.username}・${interaction.user.id}`.slice(0, 100),
-    autoArchiveDuration: 60, type: ChannelType.PrivateThread, reason: 'Ticket aberto', members: [interaction.user.id],
+    name: `${rawValue}・${interaction.user.username}・${interaction.user.id}`,
+    autoArchiveDuration: 60,
+    type: ChannelType.PrivateThread,
+    reason: 'Ticket aberto',
+    members: [interaction.user.id],
     permissionOverwrites: [
       { id: configuracao.get('ConfigRoles.cargoadm'), allow: [PermissionFlagsBits.SendMessagesInThreads] },
       { id: configuracao.get('ConfigRoles.cargosup'), allow: [PermissionFlagsBits.SendMessagesInThreads] },
       { id: interaction.user.id, allow: [PermissionFlagsBits.SendMessagesInThreads] }
-    ].filter(x => x.id)
+    ]
   });
+  const rowLink = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${thread.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
+  await interaction.editReply({ content: '✅ Ticket criado com sucesso!', components: [rowLink] });
   const appearance = tickets.get('tickets.aparencia') || {};
-  const embed = new EmbedBuilder().setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) }).setTitle(ggg.nome || functionKey).setDescription(ggg.descricao || ggg.predescricao || 'Atendimento').setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }).setTimestamp();
-  if (appearance.color) embed.setColor(appearance.color);
+  const embed = new EmbedBuilder()
+    .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+    .setTitle(ggg.nome || rawValue)
+    .setDescription(ggg.descricao === undefined ? (ggg.predescricao || 'Atendimento') : ggg.descricao)
+    .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) })
+    .setTimestamp();
   if (ggg.banner) embed.setImage(ggg.banner);
-  const mention = `${interaction.user} ${configuracao.get('ConfigRoles.cargoadm') ? '<@&' + configuracao.get('ConfigRoles.cargoadm') + '>' : ''} ${configuracao.get('ConfigRoles.cargosup') ? '<@&' + configuracao.get('ConfigRoles.cargosup') + '>' : ''}`;
-  const embeds = [embed];
-  if (support) embeds.push(purchasesEmbed(interaction.user.id, interaction.guild.id));
-  await thread.send({ content: mention, embeds, components: clientPanel(support, interaction.user.id, interaction.guild.id) });
-  const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${thread.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
-  return interaction.editReply({ content: '✅ Ticket criado com sucesso!', components: [row] });
+  if (appearance.color) embed.setColor(appearance.color);
+  const buttonNotificar = new ButtonBuilder().setCustomId('notificarticket').setLabel('Notificar').setEmoji('⏱️').setStyle(ButtonStyle.Primary);
+  const buttonAssumir = new ButtonBuilder().setCustomId('assumirticket').setLabel('Assumir Ticket').setEmoji('🎟️').setStyle(ButtonStyle.Secondary);
+  const buttonCompras = new ButtonBuilder().setCustomId('vercompras').setLabel('Compras encontradas').setEmoji('🛍️').setStyle(ButtonStyle.Primary);
+  const buttonSuporte = new ButtonBuilder().setCustomId('suportenormal').setLabel('Não é sobre um pedido adquirido').setEmoji('🆘').setStyle(ButtonStyle.Secondary);
+  const buttonSalvar = new ButtonBuilder().setCustomId('deletarsalvar').setLabel('Deletar e Salvar').setEmoji('🗑️').setStyle(ButtonStyle.Danger);
+  const components = [new ActionRowBuilder().addComponents(buttonNotificar, buttonAssumir, ...(support ? [buttonCompras] : []), buttonSuporte, buttonSalvar)];
+  if (support) components.push(...purchasePanel(interaction.user.id, interaction.guild.id));
+  const mention = `${interaction.user} ${configuracao.get('ConfigRoles.cargoadm') ? `<@&${configuracao.get('ConfigRoles.cargoadm')}>` : ''} ${configuracao.get('ConfigRoles.cargosup') ? `<@&${configuracao.get('ConfigRoles.cargosup')}>` : ''}`;
+  await thread.send({ components, embeds: [embed, ...(support ? [purchasesEmbed(interaction.user.id, interaction.guild.id)] : [])], content: mention });
+  return true;
 }
 
 function valueOf(fields, id) { return fields.getTextInputValue(id).trim(); }
 function purchaseList(userId, guildId) {
-  return estatisticas.fetchAll().map(item => ({ key: item.ID, ...item.data })).filter(item => String(item.userid) === String(userId) && (!item.guildid || String(item.guildid) === String(guildId))).slice(0, 25);
+  return estatisticas.fetchAll().map(([key, data]) => ({ key, ...(data || {}) })).filter(item => String(item.userid) === String(userId) && (!item.guildid || String(item.guildid) === String(guildId))).slice(0, 25);
 }
 function purchasePanel(userId, guildId) {
   const list = purchaseList(userId, guildId);
