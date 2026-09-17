@@ -11,7 +11,7 @@ const {
 } = require('discord.js');
 const { configuracao, estatisticas, tickets } = require('./DataBaseJson');
 const { owner: configuredOwnerId } = require('./config.json');
-const { createTicketFromModal, CreateTicket } = require('./Functions/CreateTicket');
+const { createTicketFromModal, CreateTicket, openForm } = require('./Functions/CreateTicket');
 
 const QUICK_REPLIES = {
   pagamento: 'Olá! Vou verificar o pagamento e retorno com uma atualização em breve.',
@@ -142,7 +142,7 @@ function roleModal() {
 
 function purchasesMenu(thread) {
   const owner = threadOwner(thread);
-  const list = estatisticas.fetchAll().map(item => ({ key: item.ID, ...item.data })).filter(item => String(item.userid) === owner).slice(0, 25);
+  const list = estatisticas.fetchAll().map(([key, data]) => ({ key, ...(data || {}) })).filter(item => String(item.userid) === owner).slice(0, 25);
   if (!list.length) return { content: '🛒 Nenhuma compra encontrada para o dono desta thread.', ephemeral: true };
   return { content: '🛒 Selecione a compra que deseja vincular a este ticket.', ephemeral: true, components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_purchase_link').setPlaceholder('Selecione uma compra').addOptions(list.map((p, i) => ({ value: String(p.key), label: `${i + 1}. ${String(p.produto || 'Produto').slice(0, 80)}`, description: `Pedido ${p.idpagamento || p.key}`.slice(0, 100) }))))] };
 }
@@ -189,7 +189,7 @@ async function handleClientInteraction(interaction) {
     await interaction.channel.send(`🆘 <@${owner}> informou que o assunto **não é sobre um produto adquirido**.`);
     return true;
   }
-  if (interaction.isStringSelectMenu?.() && id === 'ticket_client_options') {
+  if ((interaction.isStringSelectMenu?.() || interaction.isSelectMenu?.()) && id === 'ticket_client_options') {
     const value = interaction.values[0];
     if (value === 'add_member') return interaction.showModal(clientAddMemberModal()).then(() => true);
     const text = clientOptionText(value);
@@ -198,11 +198,13 @@ async function handleClientInteraction(interaction) {
     await interaction.channel.send(`${text}\n👤 Solicitado por <@${interaction.user.id}>.`);
     return true;
   }
-  if (interaction.isStringSelectMenu?.() && id === 'ticket_client_purchase') {
-    const item = estatisticas.get(interaction.values[0]);
-    if (!item || String(item.userid) !== String(owner)) return interaction.reply({ content: '❌ Compra não encontrada para este ticket.', ephemeral: true }).then(() => true);
-    saveState(interaction.channel, { linkedPurchase: interaction.values[0] });
-    await interaction.reply({ content: `✅ Compra vinculada: **${String(item.campo || item.produto || 'Produto').slice(0, 100)}** • Quantidade: **${item.quantidade || 1}** • Valor: **R$ ${Number(item.valor || 0).toFixed(2)}**`, ephemeral: true });
+  if ((interaction.isStringSelectMenu?.() || interaction.isSelectMenu?.()) && id === 'ticket_client_purchase') {
+    const purchases = estatisticas.fetchAll().map(([key, data]) => ({ key, ...(data || {}) }));
+    const item = purchases.find(p => String(p.key) === String(interaction.values[0]) && String(p.userid) === String(owner));
+    if (!item) return interaction.reply({ content: '❌ Compra não encontrada para este ticket.', ephemeral: true }).then(() => true);
+    saveState(interaction.channel, { linkedPurchase: item.key });
+    await interaction.reply({ content: `✅ Compra vinculada a este ticket: **${String(item.campo || item.produto || 'Produto').slice(0, 100)}** • Quantidade: **${item.quantidade || 1}** • Valor: **R$ ${Number(item.valor || 0).toFixed(2)}**`, ephemeral: true });
+    await interaction.channel.send(`🛒 O cliente <@${owner}> vinculou a compra **${String(item.produto || item.campo || 'Produto').slice(0, 100)}** ao atendimento. Pedido: **${item.idpagamento || item.key}**.`);
     return true;
   }
   if (interaction.isModalSubmit?.() && id === 'ticket_client_add_member_modal') {
@@ -320,8 +322,8 @@ async function sendTranscript(interaction, finalized = false) {
 }
 
 async function handle(interaction) {
-  if (interaction.isButton?.() && String(interaction.customId || '').startsWith('AbrirTicket_')) return await CreateTicket(interaction, String(interaction.customId).replace('AbrirTicket_', ''));
-  if ((interaction.isStringSelectMenu?.() || interaction.isSelectMenu?.()) && (interaction.customId === 'ticket_public_options' || interaction.customId === 'abrirticket')) return await CreateTicket(interaction, interaction.values[0]);
+  if (interaction.isButton?.() && String(interaction.customId || '').startsWith('AbrirTicket_')) return await interaction.showModal(openForm(String(interaction.customId).replace('AbrirTicket_', '')));
+  if ((interaction.isStringSelectMenu?.() || interaction.isSelectMenu?.()) && (interaction.customId === 'ticket_public_options' || interaction.customId === 'abrirticket')) return await interaction.showModal(openForm(interaction.values[0]));
   if (interaction.isModalSubmit?.() && interaction.customId?.startsWith('ticket_open_form_')) return await createTicketFromModal(interaction);
   if (interaction.isButton?.() && interaction.customId?.startsWith('ticket_rating_')) return handleRating(interaction);
   if (interaction.isButton?.() || interaction.isStringSelectMenu?.() || interaction.isModalSubmit?.()) {
@@ -374,7 +376,7 @@ async function handle(interaction) {
       const result = await sendTranscript(interaction, true);
       saveState(interaction.channel, { status: 'resolvido' });
       await interaction.editReply({ content: `✅ Ticket fechado e transcript HTML gerado.${result.sent.channel ? ' Enviado ao canal configurado.' : ''}${result.sent.user ? ' Enviado ao solicitante por DM.' : ' Não foi possível enviar DM ao solicitante.'}` });
-      return interaction.channel.setArchived(true, `Fechado por ${interaction.user.tag}`).catch(() => {});
+      return setTimeout(() => interaction.channel.delete(`Fechado e salvo por ${interaction.user.tag}`).catch(() => {}), 1000);
     }
   }
   if (interaction.isStringSelectMenu?.()) {

@@ -17,8 +17,11 @@ function formKind(value) { return isSupportType(value) ? 'support' : 'doubt'; }
 function formCustomId(value) { return `${FORM_PREFIX}${formKind(value)}`; }
 
 function openForm(valor) {
-  const support = formKind(valor) === 'support';
-  const modal = new ModalBuilder().setCustomId(formCustomId(valor)).setTitle(support ? 'Suporte ao Cliente' : 'Dúvidas');
+  const functions = tickets.get('tickets.funcoes') || {};
+  const entry = functions[valor] ? [valor, functions[valor]] : Object.entries(functions).find(([key, item]) => String(item?.nome || key).trim() === String(valor).trim());
+  const resolvedName = entry?.[1]?.nome || entry?.[0] || valor;
+  const support = isSupportType(resolvedName);
+  const modal = new ModalBuilder().setCustomId(formCustomId(resolvedName)).setTitle(support ? 'Suporte ao Cliente' : 'Dúvidas');
   const fields = support ? [
     ['ticket_customer', 'Nome', 'Informe seu nome ou usuário', true],
     ['ticket_order', 'Nome ou ID do produto', 'Ex.: 123456 ou Plano de jogos', true],
@@ -76,15 +79,11 @@ async function CreateTicket(interaction, valor) {
     .setTimestamp();
   if (ggg.banner) embed.setImage(ggg.banner);
   if (appearance.color) embed.setColor(appearance.color);
-  const buttonNotificar = new ButtonBuilder().setCustomId('notificarticket').setLabel('Notificar').setEmoji('⏱️').setStyle(ButtonStyle.Primary);
-  const buttonAssumir = new ButtonBuilder().setCustomId('assumirticket').setLabel('Assumir Ticket').setEmoji('🎟️').setStyle(ButtonStyle.Secondary);
-  const buttonCompras = new ButtonBuilder().setCustomId('vercompras').setLabel('Compras encontradas').setEmoji('🛍️').setStyle(ButtonStyle.Primary);
-  const buttonSuporte = new ButtonBuilder().setCustomId('suportenormal').setLabel('Não é sobre um pedido adquirido').setEmoji('🆘').setStyle(ButtonStyle.Secondary);
-  const buttonSalvar = new ButtonBuilder().setCustomId('deletarsalvar').setLabel('Deletar e Salvar').setEmoji('🗑️').setStyle(ButtonStyle.Danger);
-  const components = [new ActionRowBuilder().addComponents(buttonNotificar, buttonAssumir, ...(support ? [buttonCompras] : []), buttonSuporte, buttonSalvar)];
-  if (support) components.push(...purchasePanel(interaction.user.id, interaction.guild.id));
   const mention = `${interaction.user} ${configuracao.get('ConfigRoles.cargoadm') ? `<@&${configuracao.get('ConfigRoles.cargoadm')}>` : ''} ${configuracao.get('ConfigRoles.cargosup') ? `<@&${configuracao.get('ConfigRoles.cargosup')}>` : ''}`;
-  await thread.send({ components, embeds: [embed, ...(support ? [purchasesEmbed(interaction.user.id, interaction.guild.id)] : [])], content: mention });
+  await thread.send({ components: clientPanel(support, interaction.user.id, interaction.guild.id), embeds: [embed], content: mention });
+  if (support) {
+    await thread.send({ embeds: [purchasesEmbed(interaction.user.id, interaction.guild.id)], components: [...purchasePanel(interaction.user.id, interaction.guild.id), ...notProductPanel()] });
+  }
   return true;
 }
 
@@ -96,7 +95,7 @@ function purchasePanel(userId, guildId) {
   const list = purchaseList(userId, guildId);
   if (!list.length) return [];
   const menu = new StringSelectMenuBuilder()
-    .setCustomId('ticket_purchase_link')
+    .setCustomId('ticket_client_purchase')
     .setPlaceholder('Selecionar compra')
     .addOptions(list.map((p, i) => ({
       value: String(p.key),
@@ -118,6 +117,16 @@ function clientPanel(isSupport, userId, guildId) {
   if (isSupport) rows.push(...purchasePanel(userId, guildId));
   return rows;
 }
+function notProductPanel() {
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('ticket_not_product')
+      .setLabel('Não é sobre um produto adquirido')
+      .setEmoji('🆘')
+      .setStyle(ButtonStyle.Secondary)
+  )];
+}
+
 function purchasesEmbed(userId, guildId) {
   const list = purchaseList(userId, guildId);
   return new EmbedBuilder().setTitle('🛍️ Compras encontradas')
@@ -165,10 +174,11 @@ async function createTicketFromModal(interaction) {
   if (appearance.color) embed.setColor(appearance.color);
   if (ggg.banner) embed.setImage(ggg.banner);
   const mention = `${interaction.user} ${configuracao.get('ConfigRoles.cargoadm') ? `<@&${configuracao.get('ConfigRoles.cargoadm')}>` : ''} ${configuracao.get('ConfigRoles.cargosup') ? `<@&${configuracao.get('ConfigRoles.cargosup')}>` : ''}`;
-  const embeds = [embed];
-  if (support) embeds.push(purchasesEmbed(interaction.user.id, interaction.guild.id));
-  await thread.send({ content: mention, embeds, components: clientPanel(support, interaction.user.id, interaction.guild.id) });
+  await thread.send({ content: mention, embeds: [embed], components: clientPanel(support, interaction.user.id, interaction.guild.id) });
+  if (support) {
+    await thread.send({ embeds: [purchasesEmbed(interaction.user.id, interaction.guild.id)], components: [...purchasePanel(interaction.user.id, interaction.guild.id), ...notProductPanel()] });
+  }
   const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${thread.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
   return interaction.editReply({ content: '✅ Ticket criado com sucesso!', components: [row] });
 }
-module.exports = { CreateTicket, createTicketFromModal, formCustomId, isSupportType };
+module.exports = { CreateTicket, createTicketFromModal, formCustomId, isSupportType, openForm };
