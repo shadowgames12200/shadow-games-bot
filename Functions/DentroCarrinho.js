@@ -3,6 +3,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ModalBuilder, TextInputBu
 const { produtos, carrinhos, pagamentos, configuracao } = require("../DataBaseJson")
 const { QuickDB } = require("quick.db");
 const mercadopago = require("mercadopago");
+const paymentProviders = require('../PaymentProviders');
 const db = new QuickDB();
 
 
@@ -33,22 +34,31 @@ async function DentroCarrinhoPix(interaction, client) {
 
         const aaaa = Number(valor).toFixed(2)
 
-        var payment_data = {
-            transaction_amount: Number(aaaa),
-            description: `Pagamento - ${interaction.user.username}`,
-            payment_method_id: 'pix',
-            payer: { email: `${interaction.user.id}@users.invalid` }
+        const selectedProvider = paymentProviders.status().provider;
+        let paymentPromise;
+        if (selectedProvider === 'asaas' && paymentProviders.status().configured) {
+            const ref = paymentProviders.createOrderRef(interaction.channel.id);
+            paymentPromise = paymentProviders.createAsaasPixCharge({ ref, value: Number(aaaa), description: `Pagamento - ${interaction.user.username}`, user: interaction.user })
+                .then(result => ({ body: { id: result.id, point_of_interaction: { transaction_data: { qr_code: result.qrCode, encoded_image: result.encodedImage } } } }));
+        } else {
+            const payment_data = {
+                transaction_amount: Number(aaaa),
+                description: `Pagamento - ${interaction.user.username}`,
+                payment_method_id: 'pix',
+                payer: { email: `${interaction.user.id}@users.invalid` }
+            };
+            mercadopago.configurations.setAccessToken(process.env.MP_ACCESS_TOKEN || configuracao.get('pagamentos.MpAPI'));
+            paymentPromise = mercadopago.payment.create(payment_data);
         }
-        mercadopago.configurations.setAccessToken(process.env.MP_ACCESS_TOKEN || configuracao.get('pagamentos.MpAPI'));
-        await mercadopago.payment.create(payment_data)
+        await paymentPromise
             .then(async function (data) {
 
 
 
                 const { qrGenerator } = require('../Lib/QRCodeLib')
                 const qr = new qrGenerator({ imagePath: './Lib/aaaaa.png' })
-                const qrcode = await qr.generate(data.body.point_of_interaction.transaction_data.qr_code)
-
+                const qrData = data.body.point_of_interaction.transaction_data;
+                const qrcode = qrData.encoded_image ? { response: qrData.encoded_image } : await qr.generate(qrData.qr_code);
 
                 const buffer = Buffer.from(qrcode.response, "base64");
                 const attachment = new AttachmentBuilder(buffer, { name: "payment.png" });

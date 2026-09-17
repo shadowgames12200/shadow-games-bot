@@ -3,6 +3,7 @@ const { pagamentos, carrinhos, pedidos, produtos, configuracao } = require("../D
 const axios = require("axios");
 const { BloquearBanco } = require("./BloquearBanco");
 const { CheckPosition } = require("./PosicoesFunction");
+const paymentProviders = require('../PaymentProviders');
 
 async function VerificarPagamento(client) {
     const allPayments = pagamentos.fetchAll();
@@ -54,17 +55,14 @@ async function VerificarPagamento(client) {
         }
 
         if (method === 'pix') {
-            let res
+            let res;
+            const isAsaas = paymentProviders.status().provider === 'asaas';
             if (payment.data.pagamentos.id !== `Aprovado Manualmente`) {
-                res = await axios.get(`https://api.mercadopago.com/v1/payments/${payment.data.pagamentos.id}`, {
-                    headers: {
-                        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN || configuracao.get('pagamentos.MpAPI')}`
-                    }
-                })
+                if (isAsaas) res = { data: await paymentProviders.getAsaasPayment(payment.data.pagamentos.id) };
+                else res = await axios.get(`https://api.mercadopago.com/v1/payments/${payment.data.pagamentos.id}`, { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN || configuracao.get('pagamentos.MpAPI')}` } });
             }
-
-
-            if (res?.data.status == 'approved' || payment.data.pagamentos.id == `Aprovado Manualmente`) { //pending // approved
+            const paid = isAsaas ? res?.data?.status === 'RECEIVED' : res?.data?.status === 'approved';
+            if (paid || payment.data.pagamentos.id == `Aprovado Manualmente`) {
                 pagamentos.delete(payment.ID)
                 const yy = await carrinhos.get(payment.ID);
                 const messages = await threadChannel.messages.fetch({ limit: 100 });
@@ -103,10 +101,10 @@ async function VerificarPagamento(client) {
                 }
 
                 const lk = carrinhos.get(`${payment.ID}.replys`)
-                let bank = res?.data.point_of_interaction.transaction_data.bank_info.payer.long_name
+                let bank = isAsaas ? 'Asaas' : res?.data?.point_of_interaction?.transaction_data?.bank_info?.payer?.long_name
 
 
-                if (configuracao.get('pagamentos.BancosBloqueados') !== null) {
+                if (!isAsaas && configuracao.get('pagamentos.BancosBloqueados') !== null) {
                     const dd = await BloquearBanco(client, bank, payment.data.pagamentos.id, yy, msg)
 
                     const embed = new EmbedBuilder()
@@ -152,7 +150,7 @@ async function VerificarPagamento(client) {
                     }
 
                 }
-                const status = (payment.data.pagamentos.id === 'Aprovado Manualmente') ? 'Aprovado Manualmente' : (res.data.status === 'pending' ? 'AutoApproved' : Number(payment.data.pagamentos.id));
+                const status = (payment.data.pagamentos.id === 'Aprovado Manualmente') ? 'Aprovado Manualmente' : (isAsaas ? 'RECEIVED' : (res.data.status === 'pending' ? 'AutoApproved' : Number(payment.data.pagamentos.id)));
                 pedidos.set(payment.ID, { id: status, method: method })
 
                 await msg.edit({ content: `🕔 Aguarde...`, embeds: [] })
@@ -198,7 +196,7 @@ async function VerificarPagamento(client) {
 
 
 
-                const status2 = (payment.data.pagamentos.id === 'Aprovado Manualmente') ? 'Aprovado Manualmente' : (res.data.status === 'pending' ? 'AutoApproved' : bank);
+                const status2 = (payment.data.pagamentos.id === 'Aprovado Manualmente') ? 'Aprovado Manualmente' : (isAsaas ? 'PAYMENT_RECEIVED' : (res.data.status === 'pending' ? 'AutoApproved' : bank));
                 const dsfjmsdfjnsdfj222 = new EmbedBuilder()
                     .setColor(`${configuracao.get(`Cores.Sucesso`) == null ? `#40fc04` : configuracao.get(`Cores.Sucesso`)}`) //40fc04
                     .setAuthor({ name: `Pedido #${payment.data.pagamentos.id}` })

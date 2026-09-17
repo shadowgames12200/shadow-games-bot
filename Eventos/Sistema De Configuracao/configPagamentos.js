@@ -4,6 +4,7 @@ const { Gerenciar } = require("../../Functions/Gerenciar");
 const { FormasDePagamentos } = require("../../Functions/FormasDePagamentosConfig");
 const axios = require('axios');
 const mercadopago = require('mercadopago');
+const payments = require('../../PaymentProviders');
 const { msgbemvindo } = require("../../Functions/MensagemBemVindo");
 
 module.exports = {
@@ -213,6 +214,16 @@ module.exports = {
 
             }
 
+            if (interaction.customId === 'configurarasaas') {
+                payments.ensure();
+                const modal = new ModalBuilder().setCustomId('salvarasaas').setTitle('Configurar Asaas');
+                const key = new TextInputBuilder().setCustomId('asaas_api_key').setLabel('Chave API do Asaas').setStyle(TextInputStyle.Short).setRequired(true);
+                const secret = new TextInputBuilder().setCustomId('asaas_webhook_secret').setLabel('Token secreto do webhook').setStyle(TextInputStyle.Short).setRequired(false);
+                const mode = new TextInputBuilder().setCustomId('asaas_mode').setLabel('Modo: sandbox ou production').setValue(payments.db.payment.mode || 'sandbox').setStyle(TextInputStyle.Short).setRequired(true);
+                modal.addComponents(new ActionRowBuilder().addComponents(key), new ActionRowBuilder().addComponents(secret), new ActionRowBuilder().addComponents(mode));
+                return interaction.showModal(modal);
+            }
+
             if (interaction.customId === 'configurarbancopan') {
                 const pan = configuracao.get('pagamentos.BancoPAN') || {}
                 const modal = new ModalBuilder()
@@ -288,6 +299,16 @@ module.exports = {
             }
         }
         if (interaction.type == InteractionType.ModalSubmit) {
+
+            if (interaction.customId === 'salvarasaas') {
+                payments.ensure();
+                payments.db.payment.ASAAS_API_KEY = interaction.fields.getTextInputValue('asaas_api_key').trim();
+                payments.db.payment.webhookSecret = interaction.fields.getTextInputValue('asaas_webhook_secret').trim();
+                payments.db.payment.mode = interaction.fields.getTextInputValue('asaas_mode').trim().toLowerCase() === 'production' ? 'production' : 'sandbox';
+                payments.db.payment.provider = 'asaas';
+                payments.save();
+                return interaction.reply({ content: '✅ Asaas configurado e selecionado. Configure no Asaas o webhook usando a URL pública do Render + /webhooks/payments/asaas.', ephemeral: true });
+            }
 
             if (interaction.customId === 'salvarbancopan') {
                 const atual = configuracao.get('pagamentos.BancoPAN') || {};
