@@ -259,13 +259,19 @@ module.exports = {
                     .setRequired(true)
 
 
+                const newnameboteN5 = new TextInputBuilder()
+                    .setCustomId('tokenMP4')
+                    .setLabel(`EMOJI DA OPÇÃO (OPCIONAL)`)
+                    .setPlaceholder(`Ex.: 🅽 ou <:nome:ID>`)
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(false)
+
                 const firstActionRow3 = new ActionRowBuilder().addComponents(newnameboteN);
                 const firstActionRow4 = new ActionRowBuilder().addComponents(newnameboteN2);
                 const firstActionRow5 = new ActionRowBuilder().addComponents(newnameboteN4);
+                const firstActionRow6 = new ActionRowBuilder().addComponents(newnameboteN5);
 
-
-
-                modalaAA.addComponents(firstActionRow3, firstActionRow4, firstActionRow5);
+                modalaAA.addComponents(firstActionRow3, firstActionRow4, firstActionRow5, firstActionRow6);
                 await interaction.showModal(modalaAA);
 
 
@@ -464,6 +470,7 @@ module.exports = {
                 let nomecampo = interaction.fields.getTextInputValue('tokenMP');
                 let desccampo = interaction.fields.getTextInputValue('tokenMP2');
                 let precocampo = interaction.fields.getTextInputValue('tokenMP3');
+                let emoji = interaction.fields.getTextInputValue('tokenMP4').trim();
                 nomecampo = nomecampo.replace('.', '')
                 const ggg = await db.get(interaction.message.id)
 
@@ -479,11 +486,16 @@ module.exports = {
 
                 if (produtoExistente) return interaction.reply({ ephemeral: true, content: `❌ Nome do campo já existente.` })
 
+                if (emoji && !(/^<:.+:\d+>$|^<a:.+:\d+>$|^\p{Emoji}$/u.test(emoji))) {
+                    return interaction.reply({ ephemeral: true, content: `❌ Emoji inserido inválido.` })
+                }
+
                 produtos.push(`${ggg.name}.Campos`, {
                     estoque: [],
                     valor: Number(precocampo),
                     Nome: nomecampo,
                     desc: desccampo,
+                    ...(emoji ? { emoji } : {}),
                     criado: Date.now()
                 })
 
