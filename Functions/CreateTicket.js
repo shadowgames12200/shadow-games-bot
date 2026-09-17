@@ -35,8 +35,38 @@ function openForm(valor) {
 
 async function CreateTicket(interaction, valor) {
   if (!interaction.isButton?.() || !String(interaction.customId || '').startsWith('AbrirTicket_')) return false;
-  await interaction.showModal(openForm(valor || String(interaction.customId).replace('AbrirTicket_', '')));
-  return true;
+  const functionKey = String(valor || String(interaction.customId).replace('AbrirTicket_', '')).trim();
+  const ggg = tickets.get(`tickets.funcoes.${functionKey}`);
+  if (!ggg || !Object.keys(ggg).length) return interaction.reply({ content: '❌ Essa função de ticket não existe mais. Publique o painel novamente.', ephemeral: true });
+  const support = isSupportType(ggg.nome || functionKey);
+  const cooldown = aberturaCooldown.get(interaction.user.id) || 0;
+  if (Date.now() - cooldown < 30000) return interaction.reply({ content: '⏳ Aguarde alguns segundos antes de abrir outro ticket.', ephemeral: true });
+  aberturaCooldown.set(interaction.user.id, Date.now());
+  const existing = interaction.channel.threads.cache.find(x => x.name.includes(interaction.user.id));
+  if (existing) {
+    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${existing.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
+    return interaction.reply({ content: '❌ Você já possui um ticket aberto.', components: [row], ephemeral: true });
+  }
+  await interaction.reply({ content: '🔄 Aguarde, estamos criando seu ticket.', ephemeral: true });
+  const thread = await interaction.channel.threads.create({
+    name: `${functionKey}・${interaction.user.username}・${interaction.user.id}`.slice(0, 100),
+    autoArchiveDuration: 60, type: ChannelType.PrivateThread, reason: 'Ticket aberto', members: [interaction.user.id],
+    permissionOverwrites: [
+      { id: configuracao.get('ConfigRoles.cargoadm'), allow: [PermissionFlagsBits.SendMessagesInThreads] },
+      { id: configuracao.get('ConfigRoles.cargosup'), allow: [PermissionFlagsBits.SendMessagesInThreads] },
+      { id: interaction.user.id, allow: [PermissionFlagsBits.SendMessagesInThreads] }
+    ].filter(x => x.id)
+  });
+  const appearance = tickets.get('tickets.aparencia') || {};
+  const embed = new EmbedBuilder().setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) }).setTitle(ggg.nome || functionKey).setDescription(ggg.descricao || ggg.predescricao || 'Atendimento').setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }).setTimestamp();
+  if (appearance.color) embed.setColor(appearance.color);
+  if (ggg.banner) embed.setImage(ggg.banner);
+  const mention = `${interaction.user} ${configuracao.get('ConfigRoles.cargoadm') ? '<@&' + configuracao.get('ConfigRoles.cargoadm') + '>' : ''} ${configuracao.get('ConfigRoles.cargosup') ? '<@&' + configuracao.get('ConfigRoles.cargosup') + '>' : ''}`;
+  const embeds = [embed];
+  if (support) embeds.push(purchasesEmbed(interaction.user.id, interaction.guild.id));
+  await thread.send({ content: mention, embeds, components: clientPanel(support, interaction.user.id, interaction.guild.id) });
+  const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${thread.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
+  return interaction.editReply({ content: '✅ Ticket criado com sucesso!', components: [row] });
 }
 
 function valueOf(fields, id) { return fields.getTextInputValue(id).trim(); }
