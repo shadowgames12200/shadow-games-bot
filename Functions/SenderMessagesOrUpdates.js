@@ -72,7 +72,8 @@ async function MessageCreate(interaction, client) {
             const option = {
                 label: `${element.Nome}`,
                 description: `Preço: R$ ${Number(element.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Estoque: ${element.estoque.length}`,
-                value: `${element.Nome}_${fdfd.produto}`
+                value: `${element.Nome}_${fdfd.produto}`,
+                ...(element.emoji ? { emoji: String(element.emoji) } : {})
             }
 
 
@@ -263,7 +264,8 @@ async function UpdateMessageProduto(client, produto) {
             const option = {
                 label: `${element.Nome}`,
                 description: `Preço: R$ ${Number(element.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Estoque: ${element.estoque.length}`,
-                value: `${element.Nome}_${produto}`
+                value: `${element.Nome}_${produto}`,
+                ...(element.emoji ? { emoji: String(element.emoji) } : {})
             };
 
 
