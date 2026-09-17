@@ -36,9 +36,13 @@ function openForm(valor) {
 async function CreateTicket(interaction, valor) {
   if (!interaction.isButton?.() || !String(interaction.customId || '').startsWith('AbrirTicket_')) return false;
   const functionKey = String(valor || String(interaction.customId).replace('AbrirTicket_', '')).trim();
-  const ggg = tickets.get(`tickets.funcoes.${functionKey}`);
-  if (!ggg || !Object.keys(ggg).length) return interaction.reply({ content: '❌ Essa função de ticket não existe mais. Publique o painel novamente.', ephemeral: true });
-  const support = isSupportType(ggg.nome || functionKey);
+  const functions = tickets.get('tickets.funcoes') || {};
+  const direct = functions[functionKey] ? [functionKey, functions[functionKey]] : null;
+  const byName = Object.entries(functions).find(([key, item]) => String(item?.nome || '').trim() === functionKey);
+  const entry = direct || byName;
+  if (!entry || !entry[1] || !Object.keys(entry[1]).length) return interaction.reply({ content: '❌ Essa função de ticket não existe mais. Publique o painel novamente.', ephemeral: true });
+  const [resolvedKey, ggg] = entry;
+  const support = isSupportType(ggg.nome || resolvedKey);
   const cooldown = aberturaCooldown.get(interaction.user.id) || 0;
   if (Date.now() - cooldown < 30000) return interaction.reply({ content: '⏳ Aguarde alguns segundos antes de abrir outro ticket.', ephemeral: true });
   aberturaCooldown.set(interaction.user.id, Date.now());
