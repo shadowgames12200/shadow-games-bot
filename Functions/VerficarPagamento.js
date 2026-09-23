@@ -61,7 +61,11 @@ async function VerificarPagamento(client) {
                 continue;
             }
             if (payment.data.pagamentos.id !== `Aprovado Manualmente`) {
-                res = { data: await paymentProviders.getAsaasPayment(payment.data.pagamentos.id) };
+                const localCharge = paymentProviders.findChargeByProviderId(payment.data.pagamentos.id);
+                const locallyReceived = ['RECEIVED', 'PAYMENT_RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(String(localCharge?.status || '').toUpperCase());
+                res = locallyReceived
+                    ? { data: { status: 'RECEIVED' } }
+                    : { data: await paymentProviders.getAsaasPayment(payment.data.pagamentos.id) };
             }
             const paid = isAsaas ? res?.data?.status === 'RECEIVED' : res?.data?.status === 'approved';
             if (paid || payment.data.pagamentos.id == `Aprovado Manualmente`) {

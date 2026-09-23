@@ -36,5 +36,30 @@ async function createAsaasPixCharge({ ref, value, description, user }) {
   return { id: charge.data.id, qrCode: qr.data.payload, encodedImage: qr.data.encodedImage, expirationDate: qr.data.expirationDate };
 }
 async function getAsaasPayment(id) { const response = await axios.get(`${asaasBase()}/payments/${encodeURIComponent(id)}`, { headers: asaasHeaders(), timeout: 15000 }); return response.data; }
-function processWebhook(provider, body, signature) { ensure(); if (provider !== db.payment.provider) return { ok: false, reason: 'provider_not_selected' }; if (provider === 'asaas' && db.payment.webhookSecret && signature !== db.payment.webhookSecret) return { ok: false, reason: 'invalid_signature' }; const eventId = String(body.id || body.eventId || body.txid || crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex')); if (db.payment.events[eventId]) return { ok: true, duplicate: true }; db.payment.events[eventId] = { provider, receivedAt: new Date().toISOString(), body }; db.payment.lastEventAt = new Date().toISOString(); const payment = body.payment || body; const ref = payment.externalReference || body.txid || body.externalReference || body.external_reference || body.paymentId; if (ref && db.payment.charges[ref]) { db.payment.charges[ref].status = String(payment.status || body.event || 'PAID').toUpperCase(); db.payment.charges[ref].providerId ||= payment.id; } save(); return { ok: true, eventId, ref }; }
-module.exports = { db, save, PROVIDERS, ensure, configured, select, status, createOrderRef, recordCharge, processWebhook, createAsaasPixCharge, getAsaasPayment };
+function processWebhook(provider, body, signature) {
+  ensure();
+  if (provider !== db.payment.provider) return { ok: false, reason: 'provider_not_selected' };
+  if (provider === 'asaas' && db.payment.webhookSecret && signature !== db.payment.webhookSecret) {
+    return { ok: false, reason: 'invalid_signature' };
+  }
+  const eventId = String(body.id || body.eventId || body.txid || crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex'));
+  if (db.payment.events[eventId]) return { ok: true, duplicate: true };
+  db.payment.events[eventId] = { provider, receivedAt: new Date().toISOString(), body };
+  db.payment.lastEventAt = new Date().toISOString();
+  const payment = body.payment || body;
+  const ref = payment.externalReference || body.txid || body.externalReference || body.external_reference || body.paymentId;
+  const status = String(payment.status || body.event || 'PAID').toUpperCase();
+  const paid = ['RECEIVED', 'PAYMENT_RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(status);
+  if (ref && db.payment.charges[ref]) {
+    db.payment.charges[ref].status = status;
+    db.payment.charges[ref].providerId ||= payment.id;
+  }
+  save();
+  return { ok: true, eventId, ref, status, paid };
+}
+function findChargeByProviderId(providerId) {
+  ensure();
+  return Object.values(db.payment.charges || {}).find(charge => String(charge.providerId) === String(providerId)) || null;
+}
+
+module.exports = { db, save, PROVIDERS, ensure, configured, select, status, createOrderRef, recordCharge, processWebhook, findChargeByProviderId, createAsaasPixCharge, getAsaasPayment };
