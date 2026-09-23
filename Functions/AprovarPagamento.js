@@ -8,7 +8,6 @@ async function EntregarPagamentos(client) {
     const yy22 = pedidos.fetchAll()
 
     for (const entrega of yy22) {
-        pedidos.delete(entrega.ID)
         let autoentrega
         const yy = carrinhos.get(entrega.ID)
         if (yy == null) continue
@@ -193,7 +192,7 @@ async function EntregarPagamentos(client) {
             } catch (error) {
             }
             try {
-                if (gggaaa.roleadd !== undefined) {
+                if (gggaaa.rolerem !== undefined) {
                     await client.guilds.cache.get(yy.guild.id).members.fetch(yy.user.id).then(member => member.roles.remove(gggaaa.rolerem)).catch(console.error);
                 }
             } catch (error) {
@@ -244,7 +243,7 @@ async function EntregarPagamentos(client) {
 
                         await threadChannel.send({ components: [row6], content: `Entrega realizada! Verifique seu privado, esse ticket será excluído <t:${Math.ceil(timeStamp / 1000)}:R>` }).then(deletemsg => {
 
-                            setInterval(async () => {
+                            setTimeout(async () => {
                                 try {
                                     await threadChannel.delete()
                                 } catch (error) {
@@ -305,7 +304,7 @@ async function EntregarPagamentos(client) {
 
                         await threadChannel.send({ components: [row6], content: `Entrega realizada! Verifique seu privado, esse ticket será excluído <t:${Math.ceil(timeStamp / 1000)}:R>` }).then(deletemsg => {
 
-                            setInterval(async () => {
+                            setTimeout(async () => {
                                 try {
                                     await threadChannel.delete()
                                 } catch (error) {
@@ -406,7 +405,7 @@ async function EntregarPagamentos(client) {
 
                 threadChannel.setName(`✅・${yy.user.username}・${yy.user.id}`);
 
-                setInterval(async () => {
+                setTimeout(async () => {
                     try {
                         await threadChannel.delete()
                     } catch (error) {
@@ -564,12 +563,12 @@ async function EntregarPagamentos(client) {
 
 
 
+        }
+
+        // Só remove da fila depois que a rotina terminou os caminhos de entrega.
+        // Assim uma falha anterior ainda pode ser identificada e reprocessada.
+        pedidos.delete(entrega.ID)
     }
-
-
-
-
-}
 
 
 module.exports = {

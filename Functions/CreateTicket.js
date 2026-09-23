@@ -113,9 +113,9 @@ function clientPanel(isSupport, userId, guildId) {
     { label: 'Enviar outra informação', description: 'Adicionar uma informação no ticket', value: 'info', emoji: '📝' },
     { label: 'Adicionar membro', description: 'Solicitar a entrada de outra pessoa', value: 'add_member', emoji: '👤' }
   );
-  const rows = [new ActionRowBuilder().addComponents(options)];
-  if (isSupport) rows.push(...purchasePanel(userId, guildId));
-  return rows;
+  // O painel de compras é enviado em uma mensagem separada para suporte,
+  // junto do botão de assunto que não é sobre produto adquirido.
+  return [new ActionRowBuilder().addComponents(options)];
 }
 function notProductPanel() {
   return [new ActionRowBuilder().addComponents(

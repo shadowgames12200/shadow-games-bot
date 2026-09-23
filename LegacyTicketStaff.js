@@ -190,6 +190,7 @@ async function handleClientInteraction(interaction) {
     return true;
   }
   if ((interaction.isStringSelectMenu?.() || interaction.isSelectMenu?.()) && id === 'ticket_client_options') {
+    if (String(interaction.user.id) !== String(owner)) return interaction.reply({ content: '❌ Apenas o cliente que abriu este ticket pode usar estas opções.', ephemeral: true }).then(() => true);
     const value = interaction.values[0];
     if (value === 'add_member') return interaction.showModal(clientAddMemberModal()).then(() => true);
     const text = clientOptionText(value);
@@ -199,6 +200,7 @@ async function handleClientInteraction(interaction) {
     return true;
   }
   if ((interaction.isStringSelectMenu?.() || interaction.isSelectMenu?.()) && id === 'ticket_client_purchase') {
+    if (String(interaction.user.id) !== String(owner)) return interaction.reply({ content: '❌ Apenas o cliente que abriu este ticket pode vincular uma compra.', ephemeral: true }).then(() => true);
     const purchases = estatisticas.fetchAll().map(([key, data]) => ({ key, ...(data || {}) }));
     const item = purchases.find(p => String(p.key) === String(interaction.values[0]) && String(p.userid) === String(owner));
     if (!item) return interaction.reply({ content: '❌ Compra não encontrada para este ticket.', ephemeral: true }).then(() => true);
