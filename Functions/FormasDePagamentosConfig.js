@@ -16,9 +16,7 @@ async function FormasDePagamentos(interaction) {
     const embed = new EmbedBuilder()
         .setTitle(`Configurar formas de pagamento`)
         .setFields(
-            { name: `Mercado Pago API`, value: `${configuracao.get(`pagamentos.MpAPI`) == null ? `\`\`\`APP_USR-000000000000000-XXXXXXX-XXXXXXXXX\`\`\`` : `\`\`\`${configuracao.get(`pagamentos.MpAPI`)}\`\`\``}` },
             { name: `Asaas`, value: `${require('../PaymentProviders').status().provider === 'asaas' ? 'Selecionado' : 'Não selecionado'}` },
-            { name: `Banco PAN`, value: `${configuracao.get(`pagamentos.BancoPAN.accessToken`) || configuracao.get(`pagamentos.BancoPAN.clientSecret`) ? `Configurado` : `Não configurado`}` },
             { name: `Bancos Bloqueados`, value: `${BancosBloqueados == `` ? `Nenhum` : `${BancosBloqueados}`}` },
         )
         .setColor(`${configuracao.get(`Cores.Principal`) == null ? '0cd4cc': configuracao.get('Cores.Principal')}`)
@@ -36,21 +34,9 @@ async function FormasDePagamentos(interaction) {
     const row2 = new ActionRowBuilder()
         .addComponents(
             new ButtonBuilder()
-                .setCustomId("configurarmercadopago")
-                .setLabel('Configurar Mercado Pago')
-                .setEmoji(`1178086608004722689`)
-                .setStyle(1),
-
-            new ButtonBuilder()
                 .setCustomId("configurarasaas")
                 .setLabel('Configurar Asaas')
                 .setEmoji('💠')
-                .setStyle(1),
-
-            new ButtonBuilder()
-                .setCustomId("configurarbancopan")
-                .setLabel('Configurar Banco PAN')
-                .setEmoji('🏦')
                 .setStyle(1),
 
             new ButtonBuilder()
@@ -59,7 +45,6 @@ async function FormasDePagamentos(interaction) {
                 .setEmoji(`1193427302311264318`)
                 .setDisabled(false)
                 .setStyle(1),
-
         )
     const row3 = new ActionRowBuilder()
         .addComponents(

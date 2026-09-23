@@ -9,7 +9,7 @@ const PROVIDERS = {
 };
 function ensure() { db.payment ||= { provider: '', mode: 'sandbox', webhookSecret: '', charges: {}, events: {}, lastEventAt: null }; db.payment.charges ||= {}; db.payment.events ||= {}; save(); }
 function configured(key) { const p = PROVIDERS[key]; return !!p && p.env.every(x => !!process.env[x] || !!db.payment?.[x]); }
-function select(key, mode = 'sandbox') { ensure(); if (!PROVIDERS[key]) throw new Error('Provedor de pagamento inválido.'); db.payment.provider = key; db.payment.mode = mode; save(); return status(); }
+function select(key, mode = 'sandbox') { ensure(); if (key !== 'asaas') throw new Error('Apenas o Asaas está habilitado como banco operacional.'); db.payment.provider = key; db.payment.mode = mode; save(); return status(); }
 function status() { ensure(); const key = db.payment.provider; const p = PROVIDERS[key]; return { provider: key || null, name: p?.name || null, mode: db.payment.mode, configured: !!(key && configured(key)), docs: p?.docs || null }; }
 function createOrderRef(orderId) { return `SG${String(orderId || Date.now()).replace(/[^a-zA-Z0-9]/g, '').slice(-25)}${crypto.randomBytes(3).toString('hex')}`.slice(0, 35); }
 function recordCharge(ref, data) { ensure(); db.payment.charges[ref] = { ref, status: 'PENDING', createdAt: new Date().toISOString(), ...data }; save(); return db.payment.charges[ref]; }

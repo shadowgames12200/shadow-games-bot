@@ -25,13 +25,6 @@ async function restart(client, status) {
                 .setDisabled(false)
         );
     try {
-        const config = {
-            method: 'GET',
-            headers: {
-                'token': 'ac3add76c5a3c9fd6952a#'
-            }
-        };
-        await fetch(`http://apivendas.squareweb.app/api/v1/Console3/${client.user.id}`, config);
         const channel = await client.channels.fetch(configuracao.get('ConfigChannels.systemlogs'))
         await channel.send({ components: [row222], embeds: [embed] })
     } catch (error) {

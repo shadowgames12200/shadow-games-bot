@@ -1,6 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder } = require("discord.js");
 const { pagamentos, carrinhos, pedidos, produtos, configuracao } = require("../DataBaseJson")
-const axios = require("axios");
 const { BloquearBanco } = require("./BloquearBanco");
 const { CheckPosition } = require("./PosicoesFunction");
 const paymentProviders = require('../PaymentProviders');
@@ -57,9 +56,12 @@ async function VerificarPagamento(client) {
         if (method === 'pix') {
             let res;
             const isAsaas = paymentProviders.status().provider === 'asaas';
+            if (!isAsaas && payment.data.pagamentos.id !== `Aprovado Manualmente`) {
+                console.warn('[Pagamentos] Pagamento legado ignorado: Asaas não está selecionado.');
+                continue;
+            }
             if (payment.data.pagamentos.id !== `Aprovado Manualmente`) {
-                if (isAsaas) res = { data: await paymentProviders.getAsaasPayment(payment.data.pagamentos.id) };
-                else res = await axios.get(`https://api.mercadopago.com/v1/payments/${payment.data.pagamentos.id}`, { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN || configuracao.get('pagamentos.MpAPI')}` } });
+                res = { data: await paymentProviders.getAsaasPayment(payment.data.pagamentos.id) };
             }
             const paid = isAsaas ? res?.data?.status === 'RECEIVED' : res?.data?.status === 'approved';
             if (paid || payment.data.pagamentos.id == `Aprovado Manualmente`) {

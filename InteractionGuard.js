@@ -58,7 +58,7 @@ function fastAck(interaction) {
 
 
 
-function installInteractionGuard(client, { timeoutMs = 2500 } = {}) {
+function installInteractionGuard(client, { timeoutMs = 0 } = {}) {
   
   const guard = interaction => {
     
@@ -69,24 +69,22 @@ function installInteractionGuard(client, { timeoutMs = 2500 } = {}) {
     
     if (fast) return;
     
+    // Não envie uma segunda resposta automática depois de 2,5 s.
+    // Cada handler deve usar deferReply/deferUpdate imediatamente quando
+    // precisar de mais tempo. Uma resposta genérica aqui competia com o
+    // handler real e gerava o estado falso de "processando".
+    if (timeoutMs <= 0) return;
+
     const timer = setTimeout(() => {
-      
       if (interaction.replied || interaction.deferred) return;
-      
       interaction.reply({
-        
         content: '⏳ O bot está processando essa ação. Tente novamente em alguns segundos.',
-        
         ephemeral: true,
-        
       }).catch(() => {});
-      
     }, timeoutMs);
-    
+
     const clear = () => clearTimeout(timer);
-    
     interaction.client.once(`interactionAck:${interaction.id}`, clear);
-    
     setTimeout(clear, timeoutMs + 1500);
     
   };

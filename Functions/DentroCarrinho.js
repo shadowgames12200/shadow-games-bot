@@ -2,7 +2,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, AttachmentBuilder } = require("discord.js")
 const { produtos, carrinhos, pagamentos, configuracao } = require("../DataBaseJson")
 const { QuickDB } = require("quick.db");
-const mercadopago = require("mercadopago");
 const paymentProviders = require('../PaymentProviders');
 const db = new QuickDB();
 
@@ -34,22 +33,17 @@ async function DentroCarrinhoPix(interaction, client) {
 
         const aaaa = Number(valor).toFixed(2)
 
-        const selectedProvider = paymentProviders.status().provider;
-        let paymentPromise;
-        if (selectedProvider === 'asaas' && paymentProviders.status().configured) {
-            const ref = paymentProviders.createOrderRef(interaction.channel.id);
-            paymentPromise = paymentProviders.createAsaasPixCharge({ ref, value: Number(aaaa), description: `Pagamento - ${interaction.user.username}`, user: interaction.user })
-                .then(result => ({ body: { id: result.id, point_of_interaction: { transaction_data: { qr_code: result.qrCode, encoded_image: result.encodedImage } } } }));
-        } else {
-            const payment_data = {
-                transaction_amount: Number(aaaa),
-                description: `Pagamento - ${interaction.user.username}`,
-                payment_method_id: 'pix',
-                payer: { email: `${interaction.user.id}@users.invalid` }
-            };
-            mercadopago.configurations.setAccessToken(process.env.MP_ACCESS_TOKEN || configuracao.get('pagamentos.MpAPI'));
-            paymentPromise = mercadopago.payment.create(payment_data);
+        const providerStatus = paymentProviders.status();
+        if (providerStatus.provider !== 'asaas' || !providerStatus.configured) {
+            throw new Error('Asaas não está configurado como banco operacional.');
         }
+        const ref = paymentProviders.createOrderRef(interaction.channel.id);
+        const paymentPromise = paymentProviders.createAsaasPixCharge({
+            ref,
+            value: Number(aaaa),
+            description: `Pagamento - ${interaction.user.username}`,
+            user: interaction.user
+        }).then(result => ({ body: { id: result.id, point_of_interaction: { transaction_data: { qr_code: result.qrCode, encoded_image: result.encodedImage } } } }));
         await paymentPromise
             .then(async function (data) {
 

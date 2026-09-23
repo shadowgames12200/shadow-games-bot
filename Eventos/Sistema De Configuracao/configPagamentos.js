@@ -2,8 +2,6 @@ const { ActionRowBuilder, TextInputBuilder, TextInputStyle, InteractionType, Mod
 const { configuracao } = require("../../DataBaseJson");
 const { Gerenciar } = require("../../Functions/Gerenciar");
 const { FormasDePagamentos } = require("../../Functions/FormasDePagamentosConfig");
-const axios = require('axios');
-const mercadopago = require('mercadopago');
 const payments = require('../../PaymentProviders');
 const { msgbemvindo } = require("../../Functions/MensagemBemVindo");
 
@@ -57,118 +55,9 @@ module.exports = {
 
 
 
-            if (interaction.customId == '+18porra') {
-
-                const modalaAA = new ModalBuilder()
-                    .setCustomId('tokenMP')
-                    .setTitle(`Alterar Token`);
-
-                const newnameboteN = new TextInputBuilder()
-                    .setCustomId('tokenMP')
-                    .setLabel("TOKEN: APP_USR-000000000000000-XX...")
-                    .setPlaceholder("APP_USR-000000000000000-XX...")
-                    .setStyle(TextInputStyle.Short)
-                    .setRequired(true)
-                    .setMaxLength(256)
-
-                const firstActionRow3 = new ActionRowBuilder().addComponents(newnameboteN);
-                modalaAA.addComponents(firstActionRow3);
-                await interaction.showModal(modalaAA);
-
+            if (interaction.customId == '+18porra' || interaction.customId == '-18porra' || interaction.customId == 'configurarmercadopago') {
+                return interaction.reply({ content: '❌ Mercado Pago foi desativado. Configure e use somente o Asaas.', ephemeral: true });
             }
-
-            if (interaction.customId == '-18porra') {
-
-
-                const fernandinhaa = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setStyle(5)
-                            .setURL(`https://stormappsauth.squareweb.app/auth2/${interaction.guild.id}/VendasPrivadaV2`)
-                            .setDisabled(true)
-                            .setLabel('Autorizar Mercado Pago'),
-                        new ButtonBuilder()
-                            .setCustomId('configurarmercadopago')
-                            .setStyle(1)
-                            .setEmoji('⬅️')
-
-                    )
-
-                const forFormat = Date.now() + 10 * 60 * 1000
-
-                const timestamp = Math.floor(forFormat / 1000)
-
-                interaction.update({ embeds: [], content: `Autorizar seu **Mercado Pago** á **Node Applications**\n\n**Status:** Aguardando você autorizar.\nEssa mensagem vai expirar em <t:${timestamp}:R>\n (Para autorizar, clique no botão abaixo, selecione 'Brasil' e clique em Continuar/Confirmar/Autorizar)`, components: [fernandinhaa] }).then(async msgg => {
-
-                    const response2 = await axios.get(`https://stormappsauth.squareweb.app/token2/${interaction.guild.id}/VendasPrivadaV2`);
-                    const geral = response2.data;
-
-                    var existia = null
-
-                    if (geral.message !== 'Usuario nao encontado!') {
-                        existia = geral.access_token
-                    } else {
-                        existia = 'Não definido'
-                    }
-
-                    var status = false;
-                    var intervalId = null;
-                    var tempoLimite = 5 * 60 * 1000;
-
-                    if (status === false) {
-                        intervalId = setInterval(async () => {
-                            const response = await axios.get(`https://stormappsauth.squareweb.app/token2/${interaction.guild.id}/VendasPrivadaV2`);
-                            const geral = response.data;
-
-                            if (geral.message == 'Usuario nao encontado!') {
-                                status = false;
-                            } else {
-                                if (existia === 'Não definido' || existia !== geral.access_token) {
-                                    status = true;
-                                    clearInterval(intervalId);
-                                    configuracao.set(`pagamentos.MpAPI`, geral.access_token)
-
-                                    const fernandinhaa = new ActionRowBuilder()
-                                        .addComponents(
-                                            new ButtonBuilder()
-                                                .setCustomId('configurarmercadopago')
-                                                .setStyle(1)
-                                                .setEmoji('⬅️')
-
-                                        )
-
-                                    interaction.editReply({
-                                        content: `**Status:** ✅ Autorização bem sucedida!.`,
-                                        components: [fernandinhaa]
-                                    })
-                                }
-                            }
-                        }, 5000);
-                        setTimeout(() => {
-                            clearInterval(intervalId);
-
-                            const fernandinhaa = new ActionRowBuilder()
-                                .addComponents(
-                                    new ButtonBuilder()
-                                        .setCustomId('voltar1234sda')
-                                        .setStyle(1)
-                                        .setEmoji('⬅️')
-
-                                )
-
-                            interaction.editReply({
-                                embeds: [
-                                    new EmbedBuilder()
-                                        .setDescription('❌ | Você não se cadastrou durante 5 Minutos, cadastre-se novamente!')
-                                ],
-                                components: [fernandinhaa]
-                            })
-
-                        }, tempoLimite);
-                    }
-                })
-            }
-
 
             if (interaction.customId === 'voltaradawdwa') {
                 Gerenciar(interaction, client)
@@ -177,43 +66,6 @@ module.exports = {
                 FormasDePagamentos(interaction)
 
             }
-            if (interaction.customId == 'configurarmercadopago') {
-
-                const fernandona = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId("+18porra")
-                            .setLabel('Setar Acess Token')
-                            .setEmoji(`1190777128044724378`)
-                            .setStyle(1)
-                            .setDisabled(false),
-                        new ButtonBuilder()
-                            .setCustomId("-18porra")
-                            .setLabel('Autenticar MercadoPago [-18]')
-                            .setEmoji(`1190793840697806855`)
-                            .setStyle(3)
-                            .setDisabled(false),
-                        new ButtonBuilder()
-                            .setCustomId("bloquearbancos")
-                            .setLabel('Bloquear Bancos')
-                            .setEmoji(`🏦`)
-                            .setStyle(4)
-                            .setDisabled(false),
-
-                        new ButtonBuilder()
-                            .setCustomId("formasdepagamentos")
-                            .setLabel('Voltar')
-                            .setEmoji(`⬅️`)
-                            .setStyle(2)
-                            .setDisabled(false),
-
-                    )
-
-                interaction.update({ embeds: [], components: [fernandona], content: `O que precisa configurar?` })
-
-
-            }
-
             if (interaction.customId === 'configurarasaas') {
                 payments.ensure();
                 const modal = new ModalBuilder().setCustomId('salvarasaas').setTitle('Configurar Asaas');
@@ -384,36 +236,6 @@ module.exports = {
 
 
 
-            if (interaction.customId === 'tokenMP') {
-                const tokenMP = interaction.fields.getTextInputValue('tokenMP');
-                try {
-                    const amount = 10; // Alterei o nome da variável e fiz o parsing direto
-
-                    const payment_data = {
-                        transaction_amount: parseFloat(amount), // Use a variável 'amount' aqui
-                        description: 'Testando se o token é Válido | Node Applications',
-                        payment_method_id: 'pix',
-                        payer: { email: 'token-validation@users.invalid' },
-                    };
-
-                    mercadopago.configurations.setAccessToken(tokenMP);
-                    await mercadopago.payment.create(payment_data);
-
-                } catch (error) {
-                    await interaction.reply({
-                        content: `⚠️ | Access Token inválido!\n${error}\n\n> Tutorial para pegar o Access Token: [CliqueAqui](https://www.youtube.com/watch?v=w7kyGZUrkVY&feature=youtu.be)\n> Lembre-se de cadastrar uma chave pix na sua conta mercado pago!`,
-                        ephemeral: true,
-                    });
-                    return;
-                }
-
-                //interaction.deferUpdate()
-                FormasDePagamentos(interaction)
-                configuracao.set(`pagamentos.MpAPI`, tokenMP);
-
-
-
-            }
         }
     }
 }
