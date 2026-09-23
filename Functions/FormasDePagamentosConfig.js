@@ -1,76 +1,54 @@
-const { ActionRowBuilder, TextInputBuilder, TextInputStyle, InteractionType, ModalBuilder, EmbedBuilder, ButtonBuilder } = require("discord.js");
+const { ActionRowBuilder, EmbedBuilder, ButtonBuilder } = require("discord.js");
 const { configuracao } = require("../DataBaseJson");
 
-
-
 async function FormasDePagamentos(interaction) {
+  const bloqueados = configuracao.get('pagamentos.BancosBloqueados') || [];
+  const bancosBloqueados = bloqueados.length ? bloqueados.map(banco => `\`${banco}\``).join('\n') : 'Nenhum';
+  const paymentProviders = require('../PaymentProviders');
+  const status = paymentProviders.status();
 
-    const TirardaArrayBancosBloqueados = configuracao.get(`pagamentos.BancosBloqueados`)
-    let BancosBloqueados = ``
-    if (TirardaArrayBancosBloqueados !== null) {
-        for (let i = 0; i < TirardaArrayBancosBloqueados.length; i++) {
-            BancosBloqueados += `\`${TirardaArrayBancosBloqueados[i]}\`\n`
-        }
-    }
+  const embed = new EmbedBuilder()
+    .setTitle('Configurar formas de pagamento')
+    .setFields(
+      { name: 'Asaas', value: status.provider === 'asaas' ? `Selecionado (${status.mode})` : 'Não selecionado' },
+      { name: 'Bancos bloqueados', value: bancosBloqueados }
+    )
+    .setColor(configuracao.get('Cores.Principal') || '0cd4cc')
+    .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) })
+    .setTimestamp();
 
-    const embed = new EmbedBuilder()
-        .setTitle(`Configurar formas de pagamento`)
-        .setFields(
-            { name: `Asaas`, value: `${require('../PaymentProviders').status().provider === 'asaas' ? 'Selecionado' : 'Não selecionado'}` },
-            { name: `Bancos Bloqueados`, value: `${BancosBloqueados == `` ? `Nenhum` : `${BancosBloqueados}`}` },
-        )
-        .setColor(`${configuracao.get(`Cores.Principal`) == null ? '0cd4cc': configuracao.get('Cores.Principal')}`)
-        .setFooter(
-            { text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }
-          )
-          .setTimestamp()
+  if (configuracao.get('pagamentos.SemiAutomatico.status') === true) {
+    embed.addFields({ name: 'Pagamento manual ativado', value: String(configuracao.get('pagamentos.SemiAutomatico.msg') || 'Configurado') });
+  }
 
-    if (configuracao.get(`pagamentos.SemiAutomatico.status`) == true) {
-        embed.addFields({ name: `Pagamento manual ativado`, value: `${configuracao.get(`pagamentos.SemiAutomatico.msg`)}` })
-        embed.addFields({ name: `Chave pix definida`, value: `${configuracao.get(`pagamentos.SemiAutomatico.pix`)}` })
-    }
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('configurarasaas')
+      .setLabel('Configurar Asaas')
+      .setEmoji('💠')
+      .setStyle(1),
+    new ButtonBuilder()
+      .setCustomId('formasdepagamentos')
+      .setLabel('Editar endereços de Crypto')
+      .setEmoji('⚙️')
+      .setStyle(1)
+  );
+  const row3 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('voltaradawdwa')
+      .setLabel('Voltar')
+      .setEmoji('⬅️')
+      .setStyle(2)
+  );
+  const row4 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('ConfigurarPagamentoManual')
+      .setLabel('Configurar Pagamento Manual')
+      .setEmoji('🧾')
+      .setStyle(1)
+  );
 
-
-    const row2 = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId("configurarasaas")
-                .setLabel('Configurar Asaas')
-                .setEmoji('💠')
-                .setStyle(1),
-
-            new ButtonBuilder()
-                .setCustomId("formasdepagamentos")
-                .setLabel('Editar endereços de Crypto')
-                .setEmoji(`1193427302311264318`)
-                .setDisabled(false)
-                .setStyle(1),
-        )
-    const row3 = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId("voltaradawdwa")
-                .setLabel('Voltar')
-                .setEmoji(`1178068047202893869`)
-                .setStyle(2)
-
-        )
-
-    const row4 = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId("ConfigurarPagamentoManual")
-                .setLabel('Configurar Pagamento Manual')
-                .setEmoji(`1193427093158105129`)
-                .setStyle(1)
-
-        )
-
-
-    await interaction.update({ content: ``, embeds: [embed], ephemeral: true, components: [row2, row4, row3] })
-
+  return interaction.update({ content: '', embeds: [embed], ephemeral: true, components: [row2, row4, row3] });
 }
 
-module.exports = {
-    FormasDePagamentos
-}
+module.exports = { FormasDePagamentos };
