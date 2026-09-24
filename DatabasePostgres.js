@@ -121,6 +121,13 @@ function deletePath(root, key) {
   if (current && typeof current === 'object') delete current[parts.at(-1)];
   return root;
 }
+function legacyEntries(root) {
+  return Object.entries(clone(root)).map(([ID, data]) => {
+    const entry = { ID, data };
+    entry[Symbol.iterator] = function* iterator() { yield ID; yield data; };
+    return entry;
+  });
+}
 async function persistPostgres(name) {
   if (!pool) throw new Error('PostgreSQL indisponível');
   const data = namespaces.get(name) || {};
@@ -151,7 +158,23 @@ function createDatabase(name) {
     set(key, value) { setPath(namespaces.get(name), key, value); persist(name); return value; },
     delete(key) { deletePath(namespaces.get(name), key); persist(name); },
     has(key) { return getPath(namespaces.get(name), key) !== undefined; },
-    fetchAll() { return Object.entries(clone(namespaces.get(name))); },
+    push(key, value) {
+      const current = getPath(namespaces.get(name), key);
+      const next = Array.isArray(current) ? [...current, clone(value)] : [clone(value)];
+      setPath(namespaces.get(name), key, next);
+      persist(name);
+      return next.length;
+    },
+    pull(key, predicate) {
+      const current = getPath(namespaces.get(name), key);
+      if (!Array.isArray(current)) return [];
+      const next = typeof predicate === 'function' ? current.filter((item, index, array) => !predicate(item, index, array)) : current.filter(item => item !== predicate);
+      setPath(namespaces.get(name), key, next);
+      persist(name);
+      return next;
+    },
+    filter(predicate) { return legacyEntries(namespaces.get(name)).filter(predicate); },
+    fetchAll() { return legacyEntries(namespaces.get(name)); },
     all() { return clone(namespaces.get(name)); },
   };
 }
