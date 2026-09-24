@@ -18,6 +18,7 @@ module.exports = {
     if (interaction.user.id !== owner) { return interaction.reply({ ephemeral: true, content: `❌ | Você não possui permissão para usar esse comando.` }) }
 
     if (carrinhos.has(interaction.channel.id) == false) return interaction.reply({ content: `❌ Não há um carrinho aberto neste canal.`, ephemeral: true })
+    if (pedidos.has(interaction.channel.id)) return interaction.reply({ content: `⚠️ Este pedido já está na fila de entrega. Aguarde o processamento para evitar uma entrega duplicada.`, ephemeral: true })
 
 
     const yy = await carrinhos.get(interaction.channel.id)
@@ -90,7 +91,7 @@ module.exports = {
     }
 
     pagamentos.set(`${interaction.channel.id}`, { pagamentos: { id: `Aprovado Manualmente`, method: `pix`, data: Date.now() } })
-    interaction.reply({ content: `✅ Pagamento aprovado manualmente. Aguarde..`, ephemeral: true })
+    await interaction.reply({ content: `✅ Pagamento aprovado manualmente. Aguarde..`, ephemeral: true })
 
   }
 }
