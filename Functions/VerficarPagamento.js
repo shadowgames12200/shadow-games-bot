@@ -4,7 +4,9 @@ const { BloquearBanco } = require("./BloquearBanco");
 const { CheckPosition } = require("./PosicoesFunction");
 const paymentProviders = require('../PaymentProviders');
 
-async function VerificarPagamento(client) {
+let verificationRunning = false;
+
+async function processPayments(client) {
     const allPayments = pagamentos.fetchAll();
 
     for (const payment of allPayments) {
@@ -69,7 +71,6 @@ async function VerificarPagamento(client) {
             }
             const paid = isAsaas ? res?.data?.status === 'RECEIVED' : res?.data?.status === 'approved';
             if (paid || payment.data.pagamentos.id == `Aprovado Manualmente`) {
-                pagamentos.delete(payment.ID)
                 const yy = await carrinhos.get(payment.ID);
                 const messages = await threadChannel.messages.fetch({ limit: 100 });
                 await threadChannel.bulkDelete(messages);
@@ -158,6 +159,7 @@ async function VerificarPagamento(client) {
                 }
                 const status = (payment.data.pagamentos.id === 'Aprovado Manualmente') ? 'Aprovado Manualmente' : (isAsaas ? 'RECEIVED' : (res.data.status === 'pending' ? 'AutoApproved' : Number(payment.data.pagamentos.id)));
                 pedidos.set(payment.ID, { id: status, method: method })
+                pagamentos.delete(payment.ID)
 
                 await msg.edit({ content: `🕔 Aguarde...`, embeds: [] })
 
@@ -280,6 +282,18 @@ async function VerificarPagamento(client) {
 }
 
 
+
+
+async function VerificarPagamento(client) {
+    if (verificationRunning) return false;
+    verificationRunning = true;
+    try {
+        await processPayments(client);
+        return true;
+    } finally {
+        verificationRunning = false;
+    }
+}
 
 
 module.exports = {

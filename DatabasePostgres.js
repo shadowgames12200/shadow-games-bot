@@ -7,6 +7,8 @@ const namespaces = new Map();
 let pool = null;
 let ready = false;
 let initializing = null;
+const pendingSync = new Set();
+let retryTimer = null;
 
 function clone(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
@@ -16,6 +18,31 @@ function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8') || '{}'); }
   catch { return {}; }
 }
+
+function writeJsonAtomic(file, data) {
+  const temporary = `${file}.tmp-${process.pid}`;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(temporary, JSON.stringify(data, null, 2));
+  fs.renameSync(temporary, file);
+}
+
+function scheduleRetry() {
+  if (retryTimer || !pendingSync.size) return;
+  retryTimer = setTimeout(async () => {
+    retryTimer = null;
+    for (const name of [...pendingSync]) {
+      try {
+        await persistPostgres(name);
+        pendingSync.delete(name);
+      } catch (error) {
+        console.error(`[DatabasePostgres] Ainda não foi possível sincronizar ${name}:`, error.message);
+      }
+    }
+    if (pendingSync.size) scheduleRetry();
+  }, 30000);
+  retryTimer.unref?.();
+}
+
 
 const names = ['produtos', 'carrinhos', 'pagamentos', 'pedidos', 'configuracao', 'estatisticas', 'avaliacoes', 'tickets', 'permissions', 'refounds', 'professional'];
 function loadLocal() {
@@ -94,9 +121,27 @@ function deletePath(root, key) {
   if (current && typeof current === 'object') delete current[parts.at(-1)];
   return root;
 }
+async function persistPostgres(name) {
+  if (!pool) throw new Error('PostgreSQL indisponível');
+  const data = namespaces.get(name) || {};
+  await pool.query('insert into bot_documents(namespace, data, updated_at) values($1, $2::jsonb, now()) on conflict(namespace) do update set data = excluded.data, updated_at = now()', [name, JSON.stringify(data)]);
+}
+
 function persist(name) {
   const data = namespaces.get(name) || {};
-  if (pool) pool.query('insert into bot_documents(namespace, data, updated_at) values($1, $2::jsonb, now()) on conflict(namespace) do update set data = excluded.data, updated_at = now()', [name, JSON.stringify(data)]).catch(error => console.error(`[DatabasePostgres] Falha ao salvar ${name}:`, error.message));
+  const file = path.join(DATA_DIR, `${name}.json`);
+  try {
+    writeJsonAtomic(file, data);
+  } catch (error) {
+    console.error(`[DatabasePostgres] Falha ao salvar cópia local de ${name}:`, error.message);
+  }
+  if (pool) {
+    persistPostgres(name).catch(error => {
+      pendingSync.add(name);
+      console.error(`[DatabasePostgres] Falha ao sincronizar ${name} no PostgreSQL; cópia local preservada:`, error.message);
+      scheduleRetry();
+    });
+  }
   return data;
 }
 function createDatabase(name) {

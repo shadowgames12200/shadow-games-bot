@@ -104,22 +104,8 @@ module.exports = {
 
 
             if (interaction.customId.startsWith('wdawdawdawdwadadsadawdwadwdw')) {
+                return interaction.reply({ content: '❌ Estorno automático não está disponível neste fluxo. O provedor operacional atual é o Asaas; faça o estorno diretamente no painel do Asaas.', ephemeral: true });
 
-                let a1 = interaction.fields.getTextInputValue('tokenMP');
-                if (a1 !== 'sim') return interaction.reply({ content: `❌ | Ação não validada para realizar reembolso.`, ephemeral: true })
-                const id = interaction.customId.split('_')[1]
-
-                await interaction.reply({ content: `✅ | Estornando pagamento...`, ephemeral: true })
-
-                const axios = require('axios');
-                const refundResponse = await axios.post(`https://api.mercadopago.com/v1/payments/${id}/refunds`, {}, {
-                    headers: {
-                        'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN || configuracao.get('pagamentos.MpAPI')}`
-                    }
-                });
-
-                interaction.message.edit({ content: `✅ | Pagamento estornado com sucesso. ( Responsavel: ${interaction.user} )`, components: [] })
-                interaction.editReply({ content: `✅ | Pagamento estornado com sucesso. ( Responsavel: ${interaction.user} )` })
             }
 
         }
