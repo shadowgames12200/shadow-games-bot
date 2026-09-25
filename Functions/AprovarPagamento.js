@@ -559,13 +559,11 @@ async function EntregarPagamentos(client) {
 
         }
 
-        }
-
         // Só remove da fila depois que a rotina terminou os caminhos de entrega.
         // Assim uma falha anterior ainda pode ser identificada e reprocessada.
         pedidos.delete(entrega.ID)
     }
-
+}
 
 module.exports = {
     EntregarPagamentos
