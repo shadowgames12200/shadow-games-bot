@@ -31,7 +31,11 @@ async function DentroCarrinhoPix(interaction, client) {
         }
 
 
-        const aaaa = Number(valor).toFixed(2)
+        const valorNumerico = Number(String(valor).replace(',', '.'))
+        if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+            throw new Error(`Valor inválido para pagamento: ${valor}`)
+        }
+        const aaaa = valorNumerico.toFixed(2)
 
         const providerStatus = paymentProviders.status();
         if (providerStatus.provider !== 'asaas' || !providerStatus.configured) {

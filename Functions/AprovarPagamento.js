@@ -559,10 +559,6 @@ async function EntregarPagamentos(client) {
 
         }
 
-
-
-
-
         }
 
         // Só remove da fila depois que a rotina terminou os caminhos de entrega.
