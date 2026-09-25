@@ -16,24 +16,33 @@ function recordCharge(ref, data) { ensure(); db.payment.charges[ref] = { ref, st
 function asaasBase() { return db.payment.mode === 'sandbox' ? 'https://api-sandbox.asaas.com/v3' : 'https://api.asaas.com/v3'; }
 function asaasKey() { ensure(); return process.env.ASAAS_API_KEY || db.payment.ASAAS_API_KEY || ''; }
 function asaasHeaders() { const key = asaasKey(); if (!key) throw new Error('ASAAS_API_KEY não configurada.'); return { access_token: key, 'Content-Type': 'application/json', 'User-Agent': 'ShadowGamesBot/1.0' }; }
+function asaasError(error, operation) {
+  const details = error.response?.data;
+  const apiMessage = details?.errors?.map(item => item.description || item.code).filter(Boolean).join('; ');
+  const message = apiMessage || details?.message || error.message || 'Erro desconhecido na API Asaas.';
+  const wrapped = new Error(`[Asaas/${operation}] ${message}`);
+  wrapped.status = error.response?.status || null;
+  wrapped.details = details || null;
+  console.error(`[Asaas/${operation}]`, { status: wrapped.status, details: wrapped.details });
+  return wrapped;
+}
 async function createAsaasPixCharge({ ref, value, description, user }) {
   ensure();
-  const headers = asaasHeaders();
-  const email = `${String(user.id)}@users.invalid`;
-  const customerResult = await axios.post(`${asaasBase()}/customers`, { name: String(user.username || user.id).slice(0, 100), email }, { headers, timeout: 15000 }).catch(async error => {
-    if (error.response?.data?.errors?.some(e => /already exists|já existe/i.test(e.description || ''))) return null;
-    throw error;
-  });
-  let customer = customerResult?.data;
-  if (!customer?.id) {
-    const found = await axios.get(`${asaasBase()}/customers`, { headers, params: { email }, timeout: 15000 });
-    customer = found.data.data?.[0];
+  const numericValue = Number(String(value).replace(',', '.'));
+  if (!Number.isFinite(numericValue) || numericValue <= 0) throw new Error(`Valor inválido para cobrança: ${value}`);
+  try {
+    const headers = asaasHeaders();
+    // O Discord não fornece o e-mail do usuário. O campo é opcional no Asaas;
+    // não enviar um domínio artificial evita rejeições HTTP 400.
+    const customer = (await axios.post(`${asaasBase()}/customers`, { name: String(user.username || user.id).slice(0, 100) }, { headers, timeout: 15000 })).data;
+    if (!customer?.id) throw new Error('Não foi possível criar o cliente no Asaas.');
+    const charge = await axios.post(`${asaasBase()}/payments`, { customer: customer.id, billingType: 'PIX', value: Number(numericValue.toFixed(2)), dueDate: new Date(Date.now() + 10 * 60 * 1000).toISOString().slice(0, 10), description: String(description).slice(0, 255), externalReference: ref }, { headers, timeout: 15000 });
+    const qr = await axios.get(`${asaasBase()}/payments/${charge.data.id}/pixQrCode`, { headers, timeout: 15000 });
+    recordCharge(ref, { provider: 'asaas', providerId: charge.data.id, externalReference: ref, status: 'PENDING', customerId: customer.id });
+    return { id: charge.data.id, qrCode: qr.data.payload, encodedImage: qr.data.encodedImage, expirationDate: qr.data.expirationDate };
+  } catch (error) {
+    throw error.response ? asaasError(error, 'criar-pix') : error;
   }
-  if (!customer?.id) throw new Error('Não foi possível criar/localizar o cliente no Asaas.');
-  const charge = await axios.post(`${asaasBase()}/payments`, { customer: customer.id, billingType: 'PIX', value: Number(value), dueDate: new Date(Date.now() + 10 * 60 * 1000).toISOString().slice(0, 10), description: String(description).slice(0, 255), externalReference: ref }, { headers, timeout: 15000 });
-  const qr = await axios.get(`${asaasBase()}/payments/${charge.data.id}/pixQrCode`, { headers, timeout: 15000 });
-  recordCharge(ref, { provider: 'asaas', providerId: charge.data.id, externalReference: ref, status: 'PENDING', customerId: customer.id });
-  return { id: charge.data.id, qrCode: qr.data.payload, encodedImage: qr.data.encodedImage, expirationDate: qr.data.expirationDate };
 }
 async function getAsaasPayment(id) { const response = await axios.get(`${asaasBase()}/payments/${encodeURIComponent(id)}`, { headers: asaasHeaders(), timeout: 15000 }); return response.data; }
 function processWebhook(provider, body, signature) {
