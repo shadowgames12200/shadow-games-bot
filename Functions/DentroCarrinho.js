@@ -6,9 +6,16 @@ const paymentProviders = require('../PaymentProviders');
 const db = new QuickDB();
 
 
-async function DentroCarrinhoPix(interaction, client) {
-    await interaction.deferUpdate()
-    const tt = await interaction.message.edit({ content: `🔄 Aguarde...`, components: [] });
+async function DentroCarrinhoPix(interaction, client, cpfCnpj) {
+    const isModal = interaction.isModalSubmit?.() === true
+    if (isModal) {
+        await interaction.deferReply({ ephemeral: true })
+    } else {
+        await interaction.deferUpdate()
+    }
+    const sourceMessage = interaction.message || (await interaction.channel.messages.fetch({ limit: 20 }))
+        .find(message => message.author?.id === client.user.id && message.content?.includes('forma de pagamento'))
+    const tt = await sourceMessage.edit({ content: `🔄 Aguarde...`, components: [] });
 
 
 
@@ -51,7 +58,8 @@ async function DentroCarrinhoPix(interaction, client) {
             ref,
             value: Number(aaaa),
             description: `Pagamento - ${interaction.user.username}`,
-            user: interaction.user
+            user: interaction.user,
+            cpfCnpj
         }).then(result => ({ body: { id: result.id, point_of_interaction: { transaction_data: { qr_code: result.qrCode, encoded_image: result.encodedImage } } } }));
         await paymentPromise
             .then(async function (data) {
@@ -99,6 +107,9 @@ async function DentroCarrinhoPix(interaction, client) {
                 pagamentos.set(`${interaction.channel.id}.pagamentos`, { id: data.body.id, cp: data.body.point_of_interaction.transaction_data.qr_code, method: 'pix', data: Date.now() })
 
                 await tt.edit({ embeds: [embed], files: [attachment], content: ``, components: [row3] })
+                if (isModal && interaction.deferred) {
+                    await interaction.editReply({ content: '✅ Pagamento Pix criado. Confira o QR Code no carrinho.' })
+                }
 
                 await interaction.channel.setName(`💱・${yy.user.username}・${yy.user.id}`)
 
