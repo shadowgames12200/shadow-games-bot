@@ -24,49 +24,52 @@ const { installInteractionGuard, wrapInteractionHandler } = require('./Interacti
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.DirectMessages] });
 
-const originalClientOn = client.on.bind(client);
+const originalOn = client.on.bind(client);
 
-client.on = (event, listener) => originalClientOn(event, event === 'interactionCreate' && !listener.__interactionGuard ? wrapInteractionHandler(listener) : listener);
+client.on = (event, listener) => originalOn(event, event === 'interactionCreate' && !listener.__interactionGuard ? wrapInteractionHandler(listener) : listener);
 
 const EstatisticasNode = new (require('./Functions/VariaveisEstatisticas'))();
 
 module.exports = { EstatisticasNode };
 
-
-
 async function start() {
   
-  const token = typeof process.env.DISCORD_TOKEN === 'string' ? process.env.DISCORD_TOKEN.trim() : '';
+  const token = (process.env.DISCORD_TOKEN || '').trim();
   
   if (!token) throw new Error('Defina DISCORD_TOKEN no Render antes de iniciar o bot.');
   
-  const applicationId = Buffer.from(token.split('.')[0] || '', 'base64').toString('utf8');
+  client.on('debug', m => { if (/hello|identify|ready|close|error|invalid session/i.test(m)) console.log('[Discord] ' + m.split('\n')[0]); });
   
-  console.log(`[Discord] Iniciando Gateway com DISCORD_TOKEN${/^\d+$/.test(applicationId) ? ` da aplicação ${applicationId}` : ''}`);
+  client.once('ready', () => console.log('[Discord] Bot autenticado como ' + client.user.tag));
   
-  client.on('debug', message => { if (/hello|identify|ready|resumed|close|disconnect|error|invalid session|rate.?limit/i.test(message)) console.log(`[Discord Gateway debug] ${message.split('\n')[0]}`); });
+  client.on('shardError', (e, id) => recordError(e, { type: 'discordShardError', shardId: id }));
   
-  client.on('shardCreate', shard => console.log(`[Discord] Shard criado: ${shard.id}`));
-  
-  client.on('shardReady', shardId => console.log(`[Discord] Gateway pronto; shard ${shardId}`));
-  
-  client.once('ready', () => console.log(`[Discord] Bot autenticado como ${client.user.tag} (${client.user.id})`));
-  
-  client.on('shardReconnecting', shardId => console.warn(`[Discord] Reconectando shard ${shardId}`));
-  
-  client.on('shardDisconnect', (event, shardId) => console.error('[Discord] Gateway desconectou', { shardId, code: event?.code ?? null, reason: event?.reason?.toString?.() || '' }));
-  
-  client.on('shardError', (error, shardId) => recordError(error, { type: 'discordShardError', shardId }));
-  
-  setTimeout(() => { if (!client.isReady()) console.error('[Discord] Gateway ainda sem ready após 60s', { wsStatus: client.ws?.status ?? null, shards: [...(client.ws?.shards?.values?.() ?? [])].map(shard => ({ id: shard.id, status: shard.status, ping: shard.ping })) }); }, 60000).unref();
-  
-  const loginPromise = client.login(token);
+  const login = client.login(token);
   
   const { initialize } = require('./DatabasePostgres');
   
   await initialize();
   
-  const events = require('./Handler
+  const events = require('./Handler/events');
+  
+  const slash = require('./Handler/slash');
+  
+  client.slashCommands = new Collection();
+  
+  slash.run(client); events.run(client);
+  
+  installInteractionGuard(client); installProcessHandlers(client);
+  
+  installProfessionalSuite(client); installGovernance(client); installProduction(client);
+  
+  installSecurity(client); installLogs(client); installLegacyTicketStaff(client); ensurePayments();
+  
+  await login;
+  
+}
+
+start().catch(e => { recordError(e, { type: 'startup' }); console.error('[Startup]', e); process.exitCode = 1; });
+
 
 
 
