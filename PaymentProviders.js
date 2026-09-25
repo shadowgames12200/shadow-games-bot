@@ -26,7 +26,7 @@ function asaasError(error, operation) {
   console.error(`[Asaas/${operation}]`, { status: wrapped.status, details: wrapped.details });
   return wrapped;
 }
-async function createAsaasPixCharge({ ref, value, description, user }) {
+async function createAsaasPixCharge({ ref, value, description, user, cpfCnpj }) {
   ensure();
   const numericValue = Number(String(value).replace(',', '.'));
   if (!Number.isFinite(numericValue) || numericValue <= 0) throw new Error(`Valor inválido para cobrança: ${value}`);
@@ -34,7 +34,9 @@ async function createAsaasPixCharge({ ref, value, description, user }) {
     const headers = asaasHeaders();
     // O Discord não fornece o e-mail do usuário. O campo é opcional no Asaas;
     // não enviar um domínio artificial evita rejeições HTTP 400.
-    const customer = (await axios.post(`${asaasBase()}/customers`, { name: String(user.username || user.id).slice(0, 100) }, { headers, timeout: 15000 })).data;
+    const normalizedCpfCnpj = String(cpfCnpj || '').replace(/\D/g, '');
+    if (![11, 14].includes(normalizedCpfCnpj.length)) throw new Error('CPF ou CNPJ inválido.');
+    const customer = (await axios.post(`${asaasBase()}/customers`, { name: String(user.username || user.id).slice(0, 100), cpfCnpj: normalizedCpfCnpj }, { headers, timeout: 15000 })).data;
     if (!customer?.id) throw new Error('Não foi possível criar o cliente no Asaas.');
     const charge = await axios.post(`${asaasBase()}/payments`, { customer: customer.id, billingType: 'PIX', value: Number(numericValue.toFixed(2)), dueDate: new Date(Date.now() + 10 * 60 * 1000).toISOString().slice(0, 10), description: String(description).slice(0, 255), externalReference: ref }, { headers, timeout: 15000 });
     const qr = await axios.get(`${asaasBase()}/payments/${charge.data.id}/pixQrCode`, { headers, timeout: 15000 });
