@@ -9,10 +9,14 @@ function AtivarIntents() {
         },
     })
         .then((response) => {
+            if (!response.ok) throw new Error(`Discord /users/@me respondeu HTTP ${response.status}`)
+            const contentType = response.headers.get('content-type') || ''
+            if (!contentType.includes('application/json')) throw new Error(`Discord respondeu ${contentType || 'conteúdo não JSON'}`)
             return response.json();
         })
         .then((data) => {
-            const url = `https://discord.com/api/v9/applications/${data.id}`;
+            if (!data?.id) throw new Error('Discord não retornou o ID da aplicação')
+            const url = `https://discord.com/api/v10/applications/${data.id}`;
             fetch(url, {
                 method: "PATCH",
                 headers: {
@@ -24,9 +28,10 @@ function AtivarIntents() {
                     //"description": `**➜  Storm Apps (Vendas V2)**\n> https://discord.gg/stormbots`
                     //description: `:raio_azurlu: Bot de Vendas Automáticas, seu aliado para impulsionar suas vendas online.\n\n> **Mensalidade fixa e sem taxas adicionais sobre suas vendas.**\n> Quer saber mais? Acesse o nosso Discord em\n> https://discord.gg/stormbots`,
                 }),
-            });
+            }).catch((error) => console.error('[StartIntents] Falha ao atualizar flags:', error.message));
 
         })
+        .catch((error) => console.error('[StartIntents] Discord indisponível; seguindo inicialização:', error.message))
 }
 
 
