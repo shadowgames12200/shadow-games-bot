@@ -6,190 +6,69 @@ const paymentProviders = require('../PaymentProviders');
 const db = new QuickDB();
 
 
-async function DentroCarrinhoPix(interaction, client, cpfCnpj) {
-    const isModal = interaction.isModalSubmit?.() === true
-    if (isModal) {
-        await interaction.deferReply({ ephemeral: true })
-    } else {
-        await interaction.deferUpdate()
-    }
-    const sourceMessage = interaction.message || (await interaction.channel.messages.fetch({ limit: 20 }))
-        .find(message => message.author?.id === client.user.id && message.content?.includes('forma de pagamento'))
-    const tt = await sourceMessage.edit({ content: `🔄 Aguarde...`, components: [] });
+async function DentroCarrinhoPix(interaction, client) {
+    await interaction.deferUpdate()
+    const tt = await interaction.message.edit({ content: `🔄 Aguarde...`, components: [] });
 
-
-
+    try {
         const yy = await carrinhos.get(interaction.channel.id)
-
         const hhhh = produtos.get(`${yy.infos.produto}.Campos`)
         const gggaaa = hhhh.find(campo22 => campo22.Nome === yy.infos.campo)
-
-
-        let valor = 0
+        let valor = yy.cupomadicionado !== undefined
+            ? gggaaa.valor * yy.quantidadeselecionada
+            : gggaaa.valor * yy.quantidadeselecionada
 
         if (yy.cupomadicionado !== undefined) {
-            const valor2 = gggaaa.valor * yy.quantidadeselecionada
-
             const hhhh2 = produtos.get(`${yy.infos.produto}.Cupom`)
-            const gggaaaawdwadwa = hhhh2.find(campo22 => campo22.Nome === yy.cupomadicionado)
-            valor = valor2 * (1 - gggaaaawdwadwa.desconto / 100);
-        } else {
-            valor = gggaaa.valor * yy.quantidadeselecionada
+            const cupom = hhhh2.find(campo22 => campo22.Nome === yy.cupomadicionado)
+            valor *= (1 - cupom.desconto / 100)
         }
-
 
         const valorNumerico = Number(String(valor).replace(',', '.'))
-        if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
-            throw new Error(`Valor inválido para pagamento: ${valor}`)
-        }
-        const aaaa = valorNumerico.toFixed(2)
+        if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) throw new Error(`Valor inválido para pagamento: ${valor}`)
 
         let providerStatus = paymentProviders.status();
-        // A chave já está no ambiente do Render; inicializa o provedor no
-        // armazenamento local caso ele ainda não tenha sido selecionado.
         if (!providerStatus.provider && paymentProviders.configured('asaas')) {
             providerStatus = paymentProviders.select('asaas', process.env.ASAAS_MODE || 'sandbox');
         }
         if (providerStatus.provider !== 'asaas' || !providerStatus.configured) {
             throw new Error('Asaas não está configurado: verifique ASAAS_API_KEY no Render.');
         }
-        const ref = paymentProviders.createOrderRef(interaction.channel.id);
-        const paymentPromise = paymentProviders.createAsaasPixCharge({
+
+        const ref = paymentProviders.createOrderRef(interaction.channel.id)
+        const checkout = await paymentProviders.createAsaasCheckout({
             ref,
-            value: Number(aaaa),
+            value: valorNumerico,
             description: `Pagamento - ${interaction.user.username}`,
-            user: interaction.user,
-            cpfCnpj
-        }).then(result => ({ body: { id: result.id, point_of_interaction: { transaction_data: { qr_code: result.qrCode, encoded_image: result.encodedImage } } } }));
-        await paymentPromise
-            .then(async function (data) {
+            productName: yy.infos.produto,
+            quantity: yy.quantidadeselecionada
+        })
 
+        const embed = new EmbedBuilder()
+            .setColor(`${configuracao.get(`Cores.Principal`) == null ? '2b2d31' : configuracao.get('Cores.Principal')}`)
+            .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+            .setTitle('Pagamento via Pix')
+            .setDescription('Clique no botão abaixo para abrir o checkout oficial do Asaas. O CPF/CNPJ será informado diretamente no site seguro do Asaas.')
+            .addFields({ name: '**Detalhes**', value: `\`${yy.quantidadeselecionada}x ${yy.infos.produto} - ${yy.infos.campo} | R$ ${valorNumerico.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`` })
+            .setFooter({ text: `${interaction.guild.name} - Checkout expira em 10 minutos.` })
+            .setTimestamp()
 
-
-                const { qrGenerator } = require('../Lib/QRCodeLib')
-                const qr = new qrGenerator({ imagePath: './Lib/aaaaa.png' })
-                const qrData = data.body.point_of_interaction.transaction_data;
-                const qrcode = qrData.encoded_image ? { response: qrData.encoded_image } : await qr.generate(qrData.qr_code);
-
-                const buffer = Buffer.from(qrcode.response, "base64");
-                const attachment = new AttachmentBuilder(buffer, { name: "payment.png" });
-
-                const embed = new EmbedBuilder()
-                    .setColor(`${configuracao.get(`Cores.Principal`) == null ? '2b2d31' : configuracao.get('Cores.Principal')}`)
-                    .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
-
-                    .setTitle(`Pagamento via PIX criado`)
-                    .addFields(
-                        { name: `Código copia e cola`, value: `\`\`\`${data.body.point_of_interaction.transaction_data.qr_code}\`\`\`` }
-                    )
-                    .setFooter(
-                        { text: `${interaction.guild.name} - Pagamento expira em 10 minutos.` }
-                    )
-                    .setTimestamp()
-                    .setImage(`https://cdn.discordapp.com/attachments/1179498681481830542/1179499043777429615/qr_code.png?ex=657a0116&is=65678c16&hm=83a7242c9f6a72f9128da76b14ede8ee1df01f5ba0ed0799f8c753b92fa8ede0&`)
-
-
-
-                const row3 = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId("codigocopiaecola")
-                            .setLabel('Código copia e cola')
-                            .setStyle(2),
-
-                    )
-
-
-
-                embed.setImage('attachment://payment.png')
-
-                carrinhos.set(`${interaction.channel.id}.pagamentos`, { id: data.body.id, cp: data.body.point_of_interaction.transaction_data.qr_code, method: 'pix' })
-                pagamentos.set(`${interaction.channel.id}.pagamentos`, { id: data.body.id, cp: data.body.point_of_interaction.transaction_data.qr_code, method: 'pix', data: Date.now() })
-
-                await tt.edit({ embeds: [embed], files: [attachment], content: ``, components: [row3] })
-                if (isModal && interaction.deferred) {
-                    await interaction.editReply({ content: '✅ Pagamento Pix criado. Confira o QR Code no carrinho.' })
-                }
-
-                await interaction.channel.setName(`💱・${yy.user.username}・${yy.user.id}`)
-
-
-                const mandanopvdocara = new EmbedBuilder()
-                    .setColor(`${configuracao.get(`Cores.Processamento`) == null ? `#fcba03` : configuracao.get(`Cores.Processamento`)}`)
-                    .setAuthor({ name: `Pedido #${data.body.id}` })
-                    .setTitle(`<:cloudshopping:1267516502513418324> Pedido solicitado`)
-                    .setFooter(
-                        { text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }
-                    )
-                    .setTimestamp()
-                    .setDescription(`Seu pedido foi criado e agora está aguardando a confirmação do pagamento`)
-                    .addFields(
-                        { name: `**Detalhes**`, value: `\`${yy.quantidadeselecionada}x ${yy.infos.produto} - ${yy.infos.campo} | R$ ${Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`` }
-                    )
-
-                try {
-                    await interaction.user.send({ embeds: [mandanopvdocara] })
-                } catch (error) {
-
-                }
-
-
-
-                const dsfjmsdfjnsdfj = new EmbedBuilder()
-                    .setColor(`${configuracao.get(`Cores.Processamento`) == null ? `#fcba03` : configuracao.get(`Cores.Processamento`)}`)
-                    .setAuthor({ name: `Pedido #${data.body.id}` })
-                    .setTitle(`<:cloudshopping:1267516502513418324> Pedido solicitado`)
-                    .setDescription(`Usuário ${interaction.user} solicitou um pedido`)
-                    .addFields(
-                        { name: `**Detalhes**`, value: `\`${yy.quantidadeselecionada}x ${yy.infos.produto} - ${yy.infos.campo} | R$ ${Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`` },
-                        { name: `**Forma de pagamento**`, value: `Pix` }
-                    )
-                    .setFooter(
-                        { text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }
-                    )
-                    .setTimestamp()
-
-
-
-
-
-                try {
-                    const channela = await client.channels.fetch(configuracao.get(`ConfigChannels.logpedidos`));
-                    await channela.send({ embeds: [dsfjmsdfjnsdfj] }).then(yyyyy => {
-                        carrinhos.set(`${interaction.channel.id}.replys`, { channelid: yyyyy.channel.id, idmsg: yyyyy.id })
-                    })
-                } catch (error) {
-
-                }
-
-
-
-
-            })
-            .catch(function (error) {
-                const row3 = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId("pagarpix")
-                            .setLabel('Pix')
-                            .setStyle(3),
-
-                        new ButtonBuilder()
-                            .setCustomId("pagarcrypto")
-                            .setLabel('Crypto')
-                            .setStyle(1)
-                            .setDisabled(true),
-
-                        new ButtonBuilder()
-                            .setCustomId("voltarcarrinho")
-                            .setLabel(' Voltar')
-                            .setStyle(2)
-                    )
-
-                tt.edit({ content: `Selecione uma forma de pagamento.`, ephemeral: true, components: [row3] })
-                interaction.followUp({ content: `❌ | Ocorreu um erro ao criar o pagamento, tente novamente.\nError: ${error}`, ephemeral: true })
-            })
-
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setLabel('Abrir checkout Asaas').setStyle(5).setURL(checkout.checkoutUrl)
+        )
+        carrinhos.set(`${interaction.channel.id}.pagamentos`, { id: checkout.id, ref, method: 'pix_checkout' })
+        pagamentos.set(`${interaction.channel.id}.pagamentos`, { id: checkout.id, ref, method: 'pix_checkout', data: Date.now() })
+        await tt.edit({ embeds: [embed], content: '', components: [row] })
+        await interaction.channel.setName(`💱・${yy.user.username}・${yy.user.id}`)
+    } catch (error) {
+        const row3 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('pagarpix').setLabel('Pix').setStyle(3),
+            new ButtonBuilder().setCustomId('pagarcrypto').setLabel('Crypto').setStyle(1).setDisabled(true),
+            new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setStyle(2)
+        )
+        await tt.edit({ content: 'Selecione uma forma de pagamento.', components: [row3], embeds: [] }).catch(() => {})
+        await interaction.followUp({ content: `❌ | Ocorreu um erro ao criar o checkout, tente novamente.\nError: ${error}`, ephemeral: true }).catch(() => {})
+    }
 }
 
 async function DentroCarrinho2(interaction) {
