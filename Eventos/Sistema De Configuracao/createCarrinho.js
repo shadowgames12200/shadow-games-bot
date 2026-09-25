@@ -84,6 +84,11 @@ module.exports = {
                 return await DentroCarrinho1(interaction, 1)
 
             }
+
+            if (interaction.customId === 'pix_cpf_cnpj') {
+                const cpfCnpj = interaction.fields.getTextInputValue('cpf_cnpj')
+                return await DentroCarrinhoPix(interaction, client, cpfCnpj)
+            }
         }
 
 
@@ -101,7 +106,22 @@ module.exports = {
             }
 
             if (interaction.customId == 'pagarpix') {
-                return await DentroCarrinhoPix(interaction, client)
+                const modal = new ModalBuilder()
+                    .setCustomId('pix_cpf_cnpj')
+                    .setTitle('Dados para pagamento Pix')
+                    .addComponents(
+                        new ActionRowBuilder().addComponents(
+                            new TextInputBuilder()
+                                .setCustomId('cpf_cnpj')
+                                .setLabel('CPF ou CNPJ')
+                                .setPlaceholder('Digite somente números ou use pontuação')
+                                .setStyle(TextInputStyle.Short)
+                                .setRequired(true)
+                                .setMinLength(11)
+                                .setMaxLength(18)
+                        )
+                    )
+                return await interaction.showModal(modal)
             }
 
             if (interaction.customId == 'voltarcarrinho') {
