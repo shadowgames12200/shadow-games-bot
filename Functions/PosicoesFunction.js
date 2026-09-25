@@ -66,7 +66,6 @@ async function CheckPosition(client) {
         if (!pos) return;
 
         const role = guild.roles.cache.get(pos.role);
-        if (!role || !Number.isFinite(Number(pos.valor))) return;
         const aa = await EstatisticasNode.GastouMais(null, Number(pos.valor));
         try {
             const members = await guild.members.fetch({ user: aa.map(user => user.userid) });

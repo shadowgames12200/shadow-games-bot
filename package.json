@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node tests/smoke-critical.js"
+    "test": "node tests/smoke-critical.js && node tests/startup-order.js && node tests/start-intents.js"
   },
   "dependencies": {
     "@discordjs/voice": "^0.16.0",
@@ -16,6 +16,7 @@
     "emoji-regex": "^10.2.0",
     "express": "^4.18.2",
     "moment": "^2.30.1",
+    "mercadopago": "^1.5.16",
     "mp-webhook-portable": "^1.2.8",
     "node-fetch": "^3.3.2",
     "pg": "^8.23.0",

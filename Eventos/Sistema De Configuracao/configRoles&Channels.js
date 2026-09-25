@@ -1,4 +1,4 @@
-const { RoleSelectMenuBuilder, ActionRowBuilder, ButtonBuilder, ChannelSelectMenuBuilder, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
+const { RoleSelectMenuBuilder, ActionRowBuilder, ButtonBuilder, ChannelSelectMenuBuilder, ChannelType } = require("discord.js");
 const { configuracao } = require("../../DataBaseJson");
 const { ConfigRoles, ConfigChannels } = require("../../Functions/ConfigRoles");
 
@@ -113,19 +113,6 @@ module.exports = {
 
 
 
-
-            if (interaction.customId == 'definircargovip') {
-                const select = new RoleSelectMenuBuilder().setCustomId('definircargovip').setPlaceholder('Selecione o cargo de Cliente VIP').setMinValues(1).setMaxValues(1);
-                const voltar = new ButtonBuilder().setCustomId('voltar1roles').setLabel('Voltar').setStyle(2);
-                await interaction.update({ components: [new ActionRowBuilder().addComponents(select), new ActionRowBuilder().addComponents(voltar)] });
-            }
-
-            if (interaction.customId == 'definirvalorpvip') {
-                const modal = new ModalBuilder().setCustomId('salvarvalorpvip').setTitle('Valor mínimo para Cliente VIP');
-                const valor = new TextInputBuilder().setCustomId('valorvip').setLabel('Valor acumulado em R$').setPlaceholder('Exemplo: 500').setValue(String(configuracao.get('ConfigRoles.valorVipMinimo') || '')).setStyle(TextInputStyle.Short).setRequired(true);
-                modal.addComponents(new ActionRowBuilder().addComponents(valor));
-                await interaction.showModal(modal);
-            }
 
             if (interaction.customId == 'logpedidos') {
                 const select = new ChannelSelectMenuBuilder()
@@ -427,22 +414,7 @@ module.exports = {
                 configuracao.set(`ConfigRoles.cargomembro`, role)
                 ConfigRoles(interaction, client)
             }
-            if (interaction.customId == 'definircargovip') {
-                const role = interaction.values[0]
-                configuracao.set(`ConfigRoles.cargoVip`, role)
-                ConfigRoles(interaction, client)
-            }
 
-        }
-
-
-        if (interaction.isModalSubmit() && interaction.customId === 'salvarvalorpvip') {
-            const valor = Number(interaction.fields.getTextInputValue('valorvip').replace(',', '.'));
-            if (!Number.isFinite(valor) || valor < 0) {
-                return interaction.reply({ content: '❌ | Informe um valor válido, como 500 ou 1000,50.', ephemeral: true });
-            }
-            configuracao.set('ConfigRoles.valorVipMinimo', valor);
-            ConfigRoles(interaction, client);
         }
 
 

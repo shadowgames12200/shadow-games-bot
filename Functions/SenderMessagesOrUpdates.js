@@ -11,7 +11,7 @@ const Entrega2 = configuracao.get(`Emojis_EntregAuto`)
 
 
 let msg = ``
-if (Array.isArray(Entrega2)) {
+if (Entrega2 !== null) {
     Entrega2.sort((a, b) => {
         const numA = parseInt(a.name.replace('ea', ''), 10);
         const numB = parseInt(b.name.replace('ea', ''), 10);
@@ -72,8 +72,7 @@ async function MessageCreate(interaction, client) {
             const option = {
                 label: `${element.Nome}`,
                 description: `Preço: R$ ${Number(element.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Estoque: ${element.estoque.length}`,
-                value: `${element.Nome}_${fdfd.produto}`,
-                ...(element.emoji ? { emoji: String(element.emoji) } : {})
+                value: `${element.Nome}_${fdfd.produto}`
             }
 
 
@@ -264,8 +263,7 @@ async function UpdateMessageProduto(client, produto) {
             const option = {
                 label: `${element.Nome}`,
                 description: `Preço: R$ ${Number(element.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Estoque: ${element.estoque.length}`,
-                value: `${element.Nome}_${produto}`,
-                ...(element.emoji ? { emoji: String(element.emoji) } : {})
+                value: `${element.Nome}_${produto}`
             };
 
 

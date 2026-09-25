@@ -276,25 +276,23 @@ class EstatisticasNode {
     async GastouMais(userID = null, valor) {
         const todasAsCompras = estatisticas.fetchAll();
 
+
         const usuariosGastaramMaisQueValor = todasAsCompras.reduce((result, user) => {
-            const data = user?.data;
-            const userid = data?.userid;
-            const amount = Number(data?.valor);
-            if (!userid || !Number.isFinite(amount) || amount < Number(valor)) return result;
+            if (user.data.valor >= valor) {
+                const existingUser = result.find((u) => u.userid === user.data.userid);
 
-            const existingUser = result.find((u) => u.userid === userid);
-
-            if (existingUser) {
-                existingUser.soma += amount;
-            } else {
-                result.push({
-                    userid,
-                    soma: amount
-                });
+                if (existingUser) {
+                    existingUser.soma += user.data.valor;
+                } else {
+                    result.push({
+                        userid: user.data.userid,
+                        soma: user.data.valor
+                    });
+                }
             }
             return result;
         }, []);
-    
+
         return usuariosGastaramMaisQueValor;
     }
 

@@ -7,7 +7,7 @@ const { ConfigRoles } = require("../../Functions/ConfigRoles");
 const { msgbemvindo } = require("../../Functions/MensagemBemVindo");
 const { EstatisticasNode } = require("../../index.js");
 const { profileuser } = require("../../Functions/profile");
-const { produtos, configuracao, tickets, estatisticas } = require("../../DataBaseJson");
+const { produtos, configuracao, tickets } = require("../../DataBaseJson");
 const { Posicao1 } = require("../../Functions/PosicoesFunction.js");
 const { painelTicket } = require("../../Functions/PainelTickets.js");
 const { CreateMessageTicket, Checkarmensagensticket } = require("../../Functions/CreateMensagemTicket.js");
@@ -32,7 +32,7 @@ module.exports = {
                 NOME = NOME.replace('.', '');
                 PREDESC = PREDESC.replace('.', '');
 
-                if (tickets.has(`tickets.funcoes.${NOME}`)) {
+                if (tickets.get(`tickets.funcoes.${NOME}`) !== null) {
                     return interaction.reply({ content: `❌ | Já existe uma função com esse nome!`, ephemeral: true });
                 }
 
@@ -59,7 +59,8 @@ module.exports = {
                 if (BANNER !== '') {
                     const urlRegex = /^(ftp|http|https):\/\/[^ "]+$/;
                     if (!urlRegex.test(BANNER)) {
-                        return interaction.reply({ content: `❌ | Você escolheu incorretamente a URL do banner!`, ephemeral: true });
+                        tickets.set(`tickets.funcoes.${NOME}.banner`, BANNER)
+                        return interaction.reply({ message: dd, content: `❌ | Você escolheu incorretamente a URL do banner!`, ephemeral: true });
                     } else {
                         tickets.set(`tickets.funcoes.${NOME}.banner`, BANNER)
                     }
@@ -100,7 +101,7 @@ module.exports = {
                 if (COREMBED !== '') {
                     const hexColorRegex = /^#?([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/;
                     if (!hexColorRegex.test(COREMBED)) {
-                        
+
                         return interaction.reply({ content: `❌ Código Hex Color \`${COREMBED}\` inváldo, tente pegar [nesse site.](https://www.google.com/search?q=color+picker&oq=color+picker) `, ephemeral: true });
                     }else{
                         tickets.set(`tickets.aparencia.color`, COREMBED)
@@ -112,7 +113,7 @@ module.exports = {
                 if (BANNER !== '') {
                     const urlRegex = /^(ftp|http|https):\/\/[^ "]+$/;
                     if (!urlRegex.test(BANNER)) {
-                     
+
                         return interaction.reply({ message: dd, content: `❌ | Você escolheu incorretamente a URL do banner!`, ephemeral: true });
                     }else{
                         tickets.set(`tickets.aparencia.banner`, BANNER)
@@ -136,7 +137,7 @@ module.exports = {
 
             }
 
-      
+
 
 
             if (interaction.customId === 'aslfdjauydvaw769dg7waajnwndjo') {
@@ -287,33 +288,16 @@ module.exports = {
             }
         }
 
-        if (interaction.isSelectMenu()) {
+        let valorticket
+        if (interaction.isButton() && interaction.customId.startsWith('AbrirTicket_')) {
+            valorticket = interaction.customId.replace('AbrirTicket_', '');
+            CreateTicket(interaction, valorticket)
+        } else if (interaction.isSelectMenu() && interaction.customId === 'abrirticket') {
+            valorticket = interaction.values[0]
+            CreateTicket(interaction, valorticket)
+        }
 
-            if (interaction.customId === 'solicitarrecebimento') {
-                const ownerId = interaction.channel.ownerId || interaction.channel.name.split('・').pop();
-                if (String(interaction.user.id) !== String(ownerId)) {
-                    return interaction.reply({ content: '❌ | Somente o cliente deste ticket pode solicitar o recebimento.', ephemeral: true });
-                }
-                const compra = estatisticas.get(interaction.values[0]);
-                if (!compra || String(compra.userid) !== String(ownerId)) {
-                    return interaction.reply({ content: '❌ | Compra não encontrada para este ticket.', ephemeral: true });
-                }
-                await interaction.reply({ content: '✅ | Solicitação enviada à equipe. Aguarde o atendimento.', ephemeral: true });
-                await interaction.channel.send({
-                    content: `📦 <@&${configuracao.get('ConfigRoles.cargosup')}> <@${ownerId}> solicitou o recebimento de uma compra.`,
-                    embeds: [new EmbedBuilder()
-                        .setColor(configuracao.get('Cores.Processamento') || '#9400D3')
-                        .setTitle('📦 Solicitação de recebimento')
-                        .addFields(
-                            { name: 'Produto', value: String(compra.produto || 'Não informado').slice(0, 1024) },
-                            { name: 'Opção', value: String(compra.campo || 'Não informado').slice(0, 1024), inline: true },
-                            { name: 'Quantidade', value: String(compra.quantidade || 1), inline: true },
-                            { name: 'Pagamento', value: String(compra.idpagamento || interaction.values[0] || 'Não informado') }
-                        )
-                        .setFooter({ text: `Solicitado por ${interaction.user.tag}` })
-                        .setTimestamp()]
-                });
-            }
+        if (interaction.isSelectMenu()) {
 
             if(interaction.customId == 'asdihadbhawhdwhdaw'){
 
@@ -337,14 +321,11 @@ module.exports = {
             }
 
             if (interaction.customId == 'deletarticketsfunction') {
-                const valordelete = interaction.values || []
-                if (valordelete.length === 0) {
-                    return interaction.reply({ content: `❌ Selecione pelo menos uma função para remover.`, ephemeral: true });
-                }
+                const valordelete = interaction.values
                 for (const iterator of valordelete) {
                     tickets.delete(`tickets.funcoes.${iterator}`)
                 }
-                return await painelTicket(interaction)
+                painelTicket(interaction)
             }
 
 
@@ -406,100 +387,6 @@ module.exports = {
 
 
 
-            if (['notificarticket', 'assumirticket', 'deletarsalvar'].includes(interaction.customId)) {
-                const isStaff = interaction.member.roles.cache.has(configuracao.get('ConfigRoles.cargoadm')) ||
-                    interaction.member.roles.cache.has(configuracao.get('ConfigRoles.cargosup'));
-                if (!isStaff) return interaction.reply({ content: `❌ | Você não tem permissão para fazer isso!`, ephemeral: true });
-            }
-
-            if (interaction.customId === 'vercompras') {
-                const ownerId = interaction.channel.ownerId || interaction.channel.name.split('・').pop();
-                const compras = estatisticas.fetchAll()
-                    .map(([key, data]) => ({ key, ...(data || {}) }))
-                    .filter(item => item && String(item.userid) === String(ownerId))
-                    .sort((a, b) => Number(b.data || 0) - Number(a.data || 0));
-
-                const embedCompras = new EmbedBuilder()
-                    .setColor(configuracao.get('Cores.Principal') || '#9400D3')
-                    .setTitle('🛍️ Compras encontradas')
-                    .setDescription(compras.length ? 'Histórico de compras encontradas para este usuário:' : 'Nenhuma compra registrada para este usuário.')
-                    .setFooter({ text: 'Compras encontradas • Shadow Games' })
-                    .setTimestamp();
-
-                if (compras.length) {
-                    compras.slice(0, 25).forEach((compra, index) => {
-                        const data = compra.data ? `<t:${Math.floor(Number(compra.data) / 1000)}:d>` : 'Data não registrada';
-                        const valor = Number(compra.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                        embedCompras.addFields({
-                            name: `${index + 1}. ${compra.produto || 'Produto'}`.slice(0, 256),
-                            value: `**Status:** Entregue\n**Opção:** ${compra.campo || 'Não informada'}\n**Quantidade:** ${compra.quantidade || 1}\n**Valor:** R$ ${valor}\n**Data:** ${data}\n**Pagamento:** ${compra.idpagamento || 'Não informado'}`.slice(0, 1024),
-                            inline: false
-                        });
-                    });
-                }
-
-                const selecionarCompra = compras.length ? new ActionRowBuilder().addComponents(
-                    new Discord.StringSelectMenuBuilder()
-                        .setCustomId('solicitarrecebimento')
-                        .setPlaceholder('Selecione uma compra para solicitar o recebimento')
-                        .addOptions(compras.slice(0, 25).map((compra, index) => ({
-                            label: `${index + 1}. ${(compra.produto || 'Produto').slice(0, 70)}`,
-                            description: `Pedido ${compra.idpagamento || compra.key}`.slice(0, 100),
-                            value: String(compra.key)
-                        })))
-                ) : null;
-
-                const fecharCompras = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('fecharcompras').setLabel('Fechar painel').setEmoji('✖️').setStyle(2)
-                );
-                return interaction.reply({ embeds: [embedCompras], components: selecionarCompra ? [selecionarCompra, fecharCompras] : [fecharCompras], ephemeral: true });
-            }
-
-            if (interaction.customId === 'fecharcompras') {
-                return interaction.update({ embeds: [], content: '✅ | Painel de compras fechado.', components: [] });
-            }
-
-            if (interaction.customId === 'notificarticket') {
-                await interaction.reply({ content: `✅ | A equipe foi notificada.`, ephemeral: true });
-                try {
-                    await interaction.channel.send({ content: `🔔 <@${interaction.user.id}> solicitou atendimento. <@&${configuracao.get('ConfigRoles.cargosup')}>` });
-                } catch (error) { }
-            }
-
-            if (interaction.customId === 'assumirticket') {
-                await interaction.reply({ content: `✅ | Ticket assumido por ${interaction.user}.`, ephemeral: false });
-                try {
-                    const ownerId = interaction.channel.ownerId || interaction.channel.name.split('・').pop();
-                    await interaction.channel.setName(`atendimento・${interaction.user.username}・${ownerId}`);
-                } catch (error) { }
-            }
-
-            if (interaction.customId === 'deletarsalvar') {
-                const transcript = await interaction.channel.messages.fetch({ limit: 100 });
-                const linhas = transcript.reverse().map(msg => {
-                    const data = new Date(msg.createdTimestamp).toLocaleString('pt-BR');
-                    const autor = msg.author?.tag || 'Usuário desconhecido';
-                    return `[${data}] ${autor}: ${msg.cleanContent || '[anexo/componente]'}`;
-                });
-                const conteudo = linhas.join('\n').slice(0, 190000);
-                const anexo = new Discord.AttachmentBuilder(Buffer.from(conteudo || 'Ticket sem mensagens.'), { name: `ticket-${interaction.channel.id}.txt` });
-                const logId = configuracao.get('ConfigChannels.logpedidos') || configuracao.get('ConfigChannels.eventbuy');
-                try {
-                    const log = await client.channels.fetch(logId);
-                    await log.send({ content: `📁 Ticket encerrado por ${interaction.user}.`, files: [anexo] });
-                } catch (error) { }
-                await interaction.reply({ content: `✅ | Ticket salvo. Este canal será excluído.`, ephemeral: true });
-                setTimeout(() => interaction.channel.delete().catch(() => { }), 1000);
-            }
-
-            if (interaction.customId === 'suportenormal') {
-                const ownerId = interaction.channel.ownerId || interaction.channel.name.split('・').pop();
-                await interaction.reply({ content: `🆘 | Este ticket foi convertido em atendimento normal. A equipe ajudará você por aqui.`, ephemeral: false });
-                try {
-                    await interaction.channel.setName(`suporte・${interaction.user.username}・${ownerId}`);
-                } catch (error) { }
-            }
-
             if (interaction.customId == `postarticket`) {
                 const ggg = tickets.get(`tickets.funcoes`)
                 const ggg2 = tickets.get(`tickets.aparencia`)
@@ -528,18 +415,18 @@ module.exports = {
 
                 const ggg = tickets.get(`tickets.funcoes`)
 
-             
-                    
+
+
                 if (ggg == null || Object.keys(ggg).length == 0) {
                     return interaction.reply({ content: `❌ Não existe nenhuma função criada para remover.`, ephemeral: true });
                 }
-                
+
                  else {
 
                     const selectMenuBuilder = new Discord.StringSelectMenuBuilder()
                         .setCustomId('deletarticketsfunction')
                         .setPlaceholder('Clique aqui para selecionar')
-                        .setMinValues(1)
+                        .setMinValues(0)
 
                     for (const chave in ggg) {
                         const item = ggg[chave];
@@ -555,7 +442,7 @@ module.exports = {
 
                     }
 
-                    selectMenuBuilder.setMaxValues(Math.min(Object.keys(ggg).length, 25))
+                    selectMenuBuilder.setMaxValues(Object.keys(ggg).length)
 
                     const style2row = new ActionRowBuilder().addComponents(selectMenuBuilder);
                     try {
@@ -799,12 +686,12 @@ module.exports = {
             if (interaction.customId.startsWith('addfuncaoticket')) {
 
                 const dd = tickets.get('tickets.funcoes')
-               
-                
+
+
                 if (dd && Object.keys(dd).length > 24) {
                     return interaction.reply({ content: `❌ | Você não pode criar mais de 24 funções em seu TICKET!` });
                 }
-                  
+
                 const modalaAA = new ModalBuilder()
                     .setCustomId('sdaju11111231idsj1233js123dua123')
                     .setTitle(`Adicionar função`);
@@ -921,7 +808,7 @@ module.exports = {
             if (interaction.customId.startsWith('painelconfigticket')) {
 
 
-                return await painelTicket(interaction)
+                painelTicket(interaction)
 
 
             }
@@ -1105,7 +992,7 @@ module.exports = {
             if (interaction.customId.startsWith('painelconfigvendas')) {
 
 
-                return await Gerenciar2(interaction, client)
+                Gerenciar2(interaction, client)
 
 
 

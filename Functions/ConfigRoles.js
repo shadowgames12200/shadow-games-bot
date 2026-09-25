@@ -143,22 +143,6 @@ async function ConfigRoles(interaction, client) {
         .addComponents(
 
             new ButtonBuilder()
-                .setCustomId("definircargovip")
-                .setLabel('Definir cargo Cliente VIP')
-                .setEmoji('💎')
-                .setStyle(1),
-
-            new ButtonBuilder()
-                .setCustomId("definirvalorpvip")
-                .setLabel('Definir valor para VIP')
-                .setEmoji('💰')
-                .setStyle(1),
-
-        )
-    const row5 = new ActionRowBuilder()
-        .addComponents(
-
-            new ButtonBuilder()
                 .setCustomId("voltar2")
                 .setLabel('Voltar')
                 .setEmoji(`1178068047202893869`)
@@ -175,8 +159,6 @@ async function ConfigRoles(interaction, client) {
 **Cargo de Suporte:** ${configuracao.get(`ConfigRoles.cargosup`) == null ? `Não definido` : `<@&${configuracao.get(`ConfigRoles.cargosup`)}>`}
 **Cargo de Cliente:** ${configuracao.get(`ConfigRoles.cargoCliente`) == null ? `Não definido` : `<@&${configuracao.get(`ConfigRoles.cargoCliente`)}>`}
 **Cargo de Membro:** ${configuracao.get(`ConfigRoles.cargomembro`) == null ? `Não definido` : `<@&${configuracao.get(`ConfigRoles.cargomembro`)}>`}
-**Cargo de Cliente VIP:** ${configuracao.get(`ConfigRoles.cargoVip`) == null ? `Não definido` : `<@&${configuracao.get(`ConfigRoles.cargoVip`)}> `}
-**Valor acumulado para VIP:** R$ ${Number(configuracao.get(`ConfigRoles.valorVipMinimo`) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
     `)
         .setFooter(
             { text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }
@@ -185,9 +167,9 @@ async function ConfigRoles(interaction, client) {
 
 
     if (interaction.message == undefined) {
-        interaction.reply({ content: ``, embeds: [embed], components: [row2, row3, row4, row5] })
+        interaction.reply({ content: ``, embeds: [embed], components: [row2, row3, row4] })
     } else {
-        interaction.update({ content: ``, embeds: [embed], components: [row2, row3, row4, row5] })
+        interaction.update({ content: ``, embeds: [embed], components: [row2, row3, row4] })
     }
 
 }

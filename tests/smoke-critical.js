@@ -22,8 +22,20 @@ const event = payments.processWebhook('asaas', {
 assert.strictEqual(event.ok, true);
 assert.strictEqual(event.paid, true);
 assert.strictEqual(payments.db.payment.charges.REF_SMOKE.status, 'RECEIVED');
+assert.strictEqual(payments.getChargeByReference('REF_SMOKE').providerId, 'pay_smoke');
 assert.strictEqual(payments.processWebhook('asaas', { id: 'evt_smoke' }, 'smoke-secret').duplicate, true);
 assert.strictEqual(payments.processWebhook('asaas', { id: 'evt_bad' }, 'wrong').reason, 'invalid_signature');
+const configuredWebhookSecret = payments.db.payment.webhookSecret;
+payments.db.payment.webhookSecret = '';
+assert.strictEqual(payments.processWebhook('asaas', { id: 'evt_unconfigured' }, 'anything').reason, 'webhook_secret_not_configured');
+payments.db.payment.webhookSecret = configuredWebhookSecret;
+
+// The hosted checkout stores its local reference separately from Asaas checkout IDs.
+const verifier = read('Functions/VerficarPagamento.js');
+const checkout = read('Functions/DentroCarrinho.js');
+assert(verifier.includes("method === 'pix' || method === 'pix_checkout'"), 'hosted PIX checkout is not processed');
+assert(verifier.includes('getChargeByReference(payment.data.pagamentos.ref)'), 'hosted checkout is not correlated by local reference');
+assert(checkout.includes("method: 'pix_checkout'"), 'hosted checkout method contract changed');
 
 // Regressões conhecidas dos fluxos críticos.
 const ticket = read('Functions/CreateTicket.js');

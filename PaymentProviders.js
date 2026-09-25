@@ -74,8 +74,10 @@ async function getAsaasPayment(id) { const response = await axios.get(`${asaasBa
 function processWebhook(provider, body, signature) {
   ensure();
   if (provider !== db.payment.provider) return { ok: false, reason: 'provider_not_selected' };
-  if (provider === 'asaas' && db.payment.webhookSecret && signature !== db.payment.webhookSecret) {
-    return { ok: false, reason: 'invalid_signature' };
+  if (provider === 'asaas') {
+    const expectedSignature = process.env.ASAAS_WEBHOOK_SECRET || db.payment.webhookSecret;
+    if (!expectedSignature) return { ok: false, reason: 'webhook_secret_not_configured' };
+    if (!signature || signature !== expectedSignature) return { ok: false, reason: 'invalid_signature' };
   }
   const eventId = String(body.id || body.eventId || body.txid || crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex'));
   if (db.payment.events[eventId]) return { ok: true, duplicate: true };
@@ -98,4 +100,9 @@ function findChargeByProviderId(providerId) {
   return Object.values(db.payment.charges || {}).find(charge => String(charge.providerId) === String(providerId)) || null;
 }
 
-module.exports = { db, save, PROVIDERS, ensure, configured, select, status, createOrderRef, recordCharge, processWebhook, findChargeByProviderId, createAsaasPixCharge, createAsaasCheckout, getAsaasPayment };
+function getChargeByReference(ref) {
+  ensure();
+  return db.payment.charges[String(ref)] || null;
+}
+
+module.exports = { db, save, PROVIDERS, ensure, configured, select, status, createOrderRef, recordCharge, processWebhook, findChargeByProviderId, getChargeByReference, createAsaasPixCharge, createAsaasCheckout, getAsaasPayment };

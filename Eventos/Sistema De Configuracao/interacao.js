@@ -259,19 +259,13 @@ module.exports = {
                     .setRequired(true)
 
 
-                const newnameboteN5 = new TextInputBuilder()
-                    .setCustomId('tokenMP4')
-                    .setLabel(`EMOJI DA OPÇÃO (OPCIONAL)`)
-                    .setPlaceholder(`Ex.: 🅽 ou <:nome:ID>`)
-                    .setStyle(TextInputStyle.Short)
-                    .setRequired(false)
-
                 const firstActionRow3 = new ActionRowBuilder().addComponents(newnameboteN);
                 const firstActionRow4 = new ActionRowBuilder().addComponents(newnameboteN2);
                 const firstActionRow5 = new ActionRowBuilder().addComponents(newnameboteN4);
-                const firstActionRow6 = new ActionRowBuilder().addComponents(newnameboteN5);
 
-                modalaAA.addComponents(firstActionRow3, firstActionRow4, firstActionRow5, firstActionRow6);
+
+
+                modalaAA.addComponents(firstActionRow3, firstActionRow4, firstActionRow5);
                 await interaction.showModal(modalaAA);
 
 
@@ -379,15 +373,12 @@ module.exports = {
         let optionsCount = 0;
         let currentSelectMenuBuilder;
 
-        
-        for (const entry of ggg) {
 
-            const [productId, productValue] = Array.isArray(entry) ? entry : [entry?.ID, entry];
-            const gggg = productValue?.data ? productValue : (productValue || {});
+        for (const gggg of ggg) {
 
             let aaaaaa;
 
-            
+
             let desc = gggg?.data?.Config?.desc
 
             if(desc == undefined) {
@@ -398,8 +389,8 @@ module.exports = {
             } else {
                 aaaaaa = "Não definido";
             }
-            
-           
+
+
             let name = gggg?.data?.Config?.name
             if(name == undefined) {
                 name = "Não definido";
@@ -407,10 +398,10 @@ module.exports = {
             const option = {
                 label: `${name}`,
                 description: `${aaaaaa}`,
-                value: `${productId ?? gggg.ID ?? ''}`,
+                value: gggg.ID,
                 emoji: "1178163524443316285",
             }
-            
+
           if (optionsCount % 25 === 0) {
             if (currentSelectMenuBuilder) {
               allSelectMenus.push(currentSelectMenuBuilder);
@@ -470,11 +461,10 @@ module.exports = {
                 let nomecampo = interaction.fields.getTextInputValue('tokenMP');
                 let desccampo = interaction.fields.getTextInputValue('tokenMP2');
                 let precocampo = interaction.fields.getTextInputValue('tokenMP3');
-                let emoji = interaction.fields.getTextInputValue('tokenMP4').trim();
                 nomecampo = nomecampo.replace('.', '')
                 const ggg = await db.get(interaction.message.id)
 
-              
+
 
                 if (isNaN(precocampo)) return interaction.reply({ ephemeral: true, content: `❌ Preço inserido \`${precocampo}\` inválido.` })
 
@@ -486,16 +476,11 @@ module.exports = {
 
                 if (produtoExistente) return interaction.reply({ ephemeral: true, content: `❌ Nome do campo já existente.` })
 
-                if (emoji && !(/^<:.+:\d+>$|^<a:.+:\d+>$|^\p{Emoji}$/u.test(emoji))) {
-                    return interaction.reply({ ephemeral: true, content: `❌ Emoji inserido inválido.` })
-                }
-
                 produtos.push(`${ggg.name}.Campos`, {
                     estoque: [],
                     valor: Number(precocampo),
                     Nome: nomecampo,
                     desc: desccampo,
-                    ...(emoji ? { emoji } : {}),
                     criado: Date.now()
                 })
 
@@ -519,45 +504,45 @@ module.exports = {
 
             if (interaction.customId === 'Editar') {
                 await interaction.update({ embeds: [], components: [], content: '🔄 Aguarde...' })
-                
+
                 let nome = interaction.fields.getTextInputValue('tokenMP');
                 let desc = interaction.fields.getTextInputValue('tokenMP2');
                 let enttrega = interaction.fields.getTextInputValue('tokenMP3');
                 let icon = interaction.fields.getTextInputValue('tokenMP4');
                 let banner = interaction.fields.getTextInputValue('tokenMP5');
-                
+
                 const ggg = await db.get(interaction.message.id);
-            
+
                 if (enttrega !== '') {
                     enttrega = (enttrega.toLowerCase() === 'não') ? 'Não' : 'Sim';
                     produtos.set(`${ggg.name}.Config.entrega`, enttrega);
                 }
-            
+
                 produtos.set(`${ggg.name}.Config.name`, nome);
-            
+
                 if (desc !== '') {
                     produtos.set(`${ggg.name}.Config.desc`, desc);
                 } else {
                     produtos.delete(`${ggg.name}.Config.desc`);
                 }
-            
+
                 // Verificar se icon é uma URL válida
                 if (icon !== '' && isURL(icon)) {
                     produtos.set(`${ggg.name}.Config.icon`, icon);
                 } else {
                     produtos.delete(`${ggg.name}.Config.icon`);
                 }
-            
+
                 // Verificar se banner é uma URL válida
                 if (banner !== '' && isURL(banner)) {
                     produtos.set(`${ggg.name}.Config.banner`, banner);
                 } else {
                     produtos.delete(`${ggg.name}.Config.banner`);
                 }
-            
+
                 GerenciarProduto(interaction, 1, ggg.name);
             }
-            
+
 
 
             function isURL(str) {
@@ -574,9 +559,9 @@ module.exports = {
                 let enttrega = interaction.fields.getTextInputValue('tokenMP3');
                 let icon = interaction.fields.getTextInputValue('tokenMP4');
                 let banner = interaction.fields.getTextInputValue('tokenMP5');
-              
+
                 nome = nome.replace('.', '');
-                
+
 
 
                 if (enttrega !== 'não') {
@@ -631,6 +616,3 @@ module.exports = {
 
 
 // 🔄 Aguarde...
-
-
-

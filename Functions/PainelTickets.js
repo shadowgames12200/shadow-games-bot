@@ -9,26 +9,22 @@ async function painelTicket(interaction) {
         .setTimestamp()
 
 
-    const title = tickets.get(`tickets.aparencia.title`);
-    const description = tickets.get(`tickets.aparencia.description`);
-    const color = tickets.get(`tickets.aparencia.color`);
-    const banner = tickets.get(`tickets.aparencia.banner`);
-    if (title != null && title !== '') {
-        embed.setTitle(title)
+    if (tickets.get(`tickets.aparencia.title`) !== null) {
+        embed.setTitle(tickets.get(`tickets.aparencia.title`))
     }
-    if (description != null && description !== '') {
-        embed.setDescription(description)
+    if (tickets.get(`tickets.aparencia.description`) !== null) {
+        embed.setDescription(tickets.get(`tickets.aparencia.description`))
     }
-    if (color != null && color !== '') {
-        embed.setColor(color)
+    if (tickets.get(`tickets.aparencia.color`) !== null) {
+        embed.setColor(tickets.get(`tickets.aparencia.color`))
     }
-    if (banner != null && banner !== '') {
-        embed.setImage(banner)
+    if (tickets.get(`tickets.aparencia.banner`) !== null) {
+        embed.setImage(tickets.get(`tickets.aparencia.banner`))
     }
 
     const funcoes = tickets.get(`tickets.funcoes`);
 
-    if (funcoes && typeof funcoes === 'object' && !Array.isArray(funcoes)) {
+    if(funcoes !== null){
 
     let count = 0;
     let maxItems = 4;
@@ -55,7 +51,7 @@ async function painelTicket(interaction) {
             const maisItens = `Mais ${Object.keys(funcoes).length - maxItems} item${Object.keys(funcoes).length - maxItems > 1 ? 's' : ''}...`;
             embed.addFields({ name: '\u200B', value: maisItens });
         }
-    
+
 
 }
     // const descricaoInicial = arrayString.slice(0, 4).join('');
@@ -117,9 +113,7 @@ async function painelTicket(interaction) {
                 .setStyle(2)
         )
 
-    const payload = { content: ``, embeds: [embed], components: [row2, row3, row4] };
-    if (interaction.deferred || interaction.replied) return interaction.editReply(payload);
-    return interaction.update(payload);
+    await interaction.update({ content: ``, embeds: [embed], components: [row2, row3, row4] })
 }
 
 

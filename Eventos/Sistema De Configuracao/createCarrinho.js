@@ -11,7 +11,6 @@ const { DentroCarrinho1, DentroCarrinho2, DentroCarrinhoPix } = require("../../F
 const { VerificarCupom, AplicarCupom } = require("../../Functions/VerificarCupom");
 const { getPermissions } = require("../../Functions/PermissionsCache.js");
 const db = new QuickDB();
-const { once, release, withTimeout } = require('../../Lib/Resilience');
 
 
 module.exports = {
@@ -81,10 +80,9 @@ module.exports = {
 
                 await carrinhos.set(`${interaction.channel.id}.quantidadeselecionada`, qtd)
 
-                return await DentroCarrinho1(interaction, 1)
+                DentroCarrinho1(interaction, 1)
 
             }
-
         }
 
 
@@ -97,21 +95,21 @@ module.exports = {
 
             if (interaction.customId == 'codigocopiaecola') {
                 const yy = await carrinhos.get(interaction.channel.id)
-                return await interaction.reply({ content: `${yy.pagamentos.cp}`, ephemeral: true })
+                interaction.reply({ content: `${yy.pagamentos.cp}`, ephemeral: true })
 
             }
 
             if (interaction.customId == 'pagarpix') {
-                return await DentroCarrinhoPix(interaction, client)
+                DentroCarrinhoPix(interaction, client)
             }
 
             if (interaction.customId == 'voltarcarrinho') {
-                return await DentroCarrinho1(interaction, 1)
+                DentroCarrinho1(interaction, 1)
             }
 
             if (interaction.customId == 'irparapagamento') {
                 if (configuracao.get(`pagamentos.SemiAutomatico.status`) == true) {
-                    await interaction.deferUpdate()
+                    interaction.deferUpdate()
                     await interaction.message.edit({ content: `Espere um momento...`, components: [], embeds: [] })
 
                     const pagamento = configuracao.get(`pagamentos.SemiAutomatico`)
@@ -194,25 +192,22 @@ module.exports = {
                     await interaction.message.edit({ content: ``, embeds: [embed], components: [row3], files: [attachment] })
                     await interaction.channel.send({ content: `|| <@&1270059315381927996> || ${interaction.user} ${pagamento.msg}` })
 
-                    await interaction.channel.setName(`➕・${interaction.user.username}・${interaction.user.id}`)
+                    interaction.channel.setName(`➕・${interaction.user.username}・${interaction.user.id}`)
 
                 } else {
-                    return await DentroCarrinho2(interaction)
+                    DentroCarrinho2(interaction)
                 }
 
             }
 
             if (interaction.customId == 'confirmarpagamentomanual') {
 
-                await interaction.deferReply({ ephemeral: true })
-                const actionKey = `manual-payment:${interaction.guildId}:${interaction.channelId}`;
-                if (!once(actionKey, 30000)) return interaction.editReply({ content: '⏳ Este pagamento já está sendo processado. Aguarde um instante.' });
                 const perm = await getPermissions(interaction.user.id)
                 if (perm === null || !perm.includes(interaction.user.id)) {
-                    release(actionKey); return interaction.editReply({ content: `❌ | Você não possui permissão para usar esse comando.` });
+                    return interaction.reply({ content: `❌ | Você não possui permissão para usar esse comando.`, ephemeral: true });
                 }
 
-                if (carrinhos.has(interaction.channel.id) == false) { release(actionKey); return interaction.editReply({ content: `❌ Não há um carrinho aberto neste canal.` }); }
+                if (carrinhos.has(interaction.channel.id) == false) return interaction.reply({ content: `❌ Não há um carrinho aberto neste canal.`, ephemeral: true })
 
                 interaction.message.delete()
 
@@ -286,7 +281,7 @@ module.exports = {
                 }
 
                 pagamentos.set(`${interaction.channel.id}`, { pagamentos: { id: `Aprovado Manualmente`, method: `pix`, data: Date.now() } })
-                release(actionKey); interaction.editReply({ content: `✅ Pagamento aprovado manualmente. Aguarde..` })
+                interaction.reply({ content: `✅ Pagamento aprovado manualmente. Aguarde..`, ephemeral: true })
 
             }
 
@@ -483,7 +478,7 @@ module.exports = {
                     )
                 interaction.reply({ content: `Este item está fora de estoque.`, ephemeral: true, components: [row3] })
 
-                // 
+                //
 
             }
             const hhhh = produtos.get(`${infos.produto}.Campos`)
@@ -496,11 +491,11 @@ module.exports = {
                 if (temCargo == false) return interaction.reply({ content: `❌ Você não possui permissão para comprar esse produto!`, ephemeral: true })
             }
 
-            if (verify.status === 202) {
+            if (verify.status == 202) {
 
 
 
-                return await CreateCarrinho(interaction, infos)
+                CreateCarrinho(interaction, infos)
 
 
 

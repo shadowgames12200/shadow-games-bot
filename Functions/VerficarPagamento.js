@@ -5,6 +5,7 @@ const { CheckPosition } = require("./PosicoesFunction");
 const paymentProviders = require('../PaymentProviders');
 
 let verificationRunning = false;
+const asaasPaidStatuses = new Set(['RECEIVED', 'PAYMENT_RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH', 'CHECKOUT_PAID']);
 
 async function processPayments(client) {
     const allPayments = pagamentos.fetchAll();
@@ -50,26 +51,46 @@ async function processPayments(client) {
             }
 
         } catch (error) {
-            console.error(`Error processing PIX payment for ID ${payment.ID}: ${error}`);
-            pagamentos.delete(payment.ID);
-            carrinhos.delete(payment.ID)
+            console.error(`[Pagamentos] Falha ao consultar o canal da fila ${payment.ID}:`, error.message);
+            if (Number(error.code) === 10003) {
+                // Remove only records whose Discord channel is definitively gone.
+                pagamentos.delete(payment.ID);
+                carrinhos.delete(payment.ID);
+            }
+            // Network/API errors are retried on the next verification pass.
+            continue;
         }
 
-        if (method === 'pix') {
+        if (method === 'pix' || method === 'pix_checkout') {
             let res;
             const isAsaas = paymentProviders.status().provider === 'asaas';
+            if (method === 'pix_checkout' && !isAsaas) {
+                console.warn('[Pagamentos] Checkout Asaas pendente, mas o provedor Asaas não está selecionado.');
+                continue;
+            }
             if (!isAsaas && payment.data.pagamentos.id !== `Aprovado Manualmente`) {
                 console.warn('[Pagamentos] Pagamento legado ignorado: Asaas não está selecionado.');
                 continue;
             }
             if (payment.data.pagamentos.id !== `Aprovado Manualmente`) {
-                const localCharge = paymentProviders.findChargeByProviderId(payment.data.pagamentos.id);
-                const locallyReceived = ['RECEIVED', 'PAYMENT_RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(String(localCharge?.status || '').toUpperCase());
-                res = locallyReceived
-                    ? { data: { status: 'RECEIVED' } }
-                    : { data: await paymentProviders.getAsaasPayment(payment.data.pagamentos.id) };
+                if (method === 'pix_checkout') {
+                    const localCharge = paymentProviders.getChargeByReference(payment.data.pagamentos.ref);
+                    res = { data: { status: localCharge?.status || 'PENDING' } };
+                } else {
+                    const localCharge = paymentProviders.findChargeByProviderId(payment.data.pagamentos.id);
+                    if (!localCharge) {
+                        console.warn(`[Pagamentos] Sem cobrança Asaas correlacionada para o registro ${payment.ID}; fila preservada.`);
+                        continue;
+                    }
+                    const locallyReceived = asaasPaidStatuses.has(String(localCharge?.status || '').toUpperCase());
+                    res = locallyReceived
+                        ? { data: { status: localCharge.status } }
+                        : { data: await paymentProviders.getAsaasPayment(payment.data.pagamentos.id) };
+                }
             }
-            const paid = isAsaas ? res?.data?.status === 'RECEIVED' : res?.data?.status === 'approved';
+            const paid = isAsaas
+                ? asaasPaidStatuses.has(String(res?.data?.status || '').toUpperCase())
+                : res?.data?.status === 'approved';
             if (paid || payment.data.pagamentos.id == `Aprovado Manualmente`) {
                 const yy = await carrinhos.get(payment.ID);
                 const messages = await threadChannel.messages.fetch({ limit: 100 });

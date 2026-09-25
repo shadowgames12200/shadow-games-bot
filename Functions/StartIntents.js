@@ -1,42 +1,40 @@
+'use strict';
 
-const config = require("../config.json");
+const DISCORD_API = 'https://discord.com/api/v10';
 
-function AtivarIntents() {
+/**
+ * Update application feature flags using the deployment token.
+ * This REST PATCH does not enable privileged Gateway intents; those remain a
+ * Discord Developer Portal setting. The helper is deliberately not auto-run
+ * during bot startup.
+ */
+async function AtivarIntents(token = process.env.DISCORD_TOKEN, fetchImpl = globalThis.fetch) {
+  const botToken = String(token || '').trim();
+  if (!botToken) throw new Error('DISCORD_TOKEN não configurado.');
+  if (typeof fetchImpl !== 'function') throw new Error('A função fetch não está disponível.');
 
-    fetch('https://discord.com/api/v10/users/@me', {
-        headers: {
-            Authorization: `Bot ${config.token}`,
-        },
-    })
-        .then((response) => {
-            if (!response.ok) throw new Error(`Discord /users/@me respondeu HTTP ${response.status}`)
-            const contentType = response.headers.get('content-type') || ''
-            if (!contentType.includes('application/json')) throw new Error(`Discord respondeu ${contentType || 'conteúdo não JSON'}`)
-            return response.json();
-        })
-        .then((data) => {
-            if (!data?.id) throw new Error('Discord não retornou o ID da aplicação')
-            const url = `https://discord.com/api/v10/applications/${data.id}`;
-            fetch(url, {
-                method: "PATCH",
-                headers: {
-                    Authorization: `Bot ${config.token}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    "flags": 8953856,
-                    //"description": `**➜  Storm Apps (Vendas V2)**\n> https://discord.gg/stormbots`
-                    //description: `:raio_azurlu: Bot de Vendas Automáticas, seu aliado para impulsionar suas vendas online.\n\n> **Mensalidade fixa e sem taxas adicionais sobre suas vendas.**\n> Quer saber mais? Acesse o nosso Discord em\n> https://discord.gg/stormbots`,
-                }),
-            }).catch((error) => console.error('[StartIntents] Falha ao atualizar flags:', error.message));
+  const headers = {
+    Authorization: `Bot ${botToken}`,
+    'Content-Type': 'application/json',
+  };
+  const me = await fetchImpl(`${DISCORD_API}/users/@me`, { headers });
+  if (!me.ok) throw new Error(`Discord /users/@me respondeu HTTP ${me.status}`);
+  const contentType = me.headers?.get?.('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`Discord respondeu ${contentType || 'conteúdo não JSON'}`);
+  }
 
-        })
-        .catch((error) => console.error('[StartIntents] Discord indisponível; seguindo inicialização:', error.message))
+  const application = await me.json();
+  if (!application?.id) throw new Error('Discord não retornou o ID da aplicação.');
+
+  const updated = await fetchImpl(`${DISCORD_API}/applications/${encodeURIComponent(application.id)}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ flags: 8953856 }),
+  });
+  if (!updated.ok) throw new Error(`Discord PATCH de flags respondeu HTTP ${updated.status}`);
+
+  return { applicationId: application.id, updated: true };
 }
 
-
-
-
-module.exports = {
-    AtivarIntents
-}
+module.exports = { AtivarIntents };
