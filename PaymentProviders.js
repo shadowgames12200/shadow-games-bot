@@ -46,6 +46,30 @@ async function createAsaasPixCharge({ ref, value, description, user, cpfCnpj }) 
     throw error.response ? asaasError(error, 'criar-pix') : error;
   }
 }
+async function createAsaasCheckout({ ref, value, description, productName, quantity }) {
+  ensure();
+  const numericValue = Number(String(value).replace(',', '.'));
+  if (!Number.isFinite(numericValue) || numericValue <= 0) throw new Error(`Valor inválido para checkout: ${value}`);
+  try {
+    const headers = asaasHeaders();
+    const publicUrl = process.env.RENDER_EXTERNAL_URL || 'https://shadow-games-bot-na47.onrender.com';
+    const response = await axios.post(`${asaasBase()}/checkouts`, {
+      billingTypes: ['PIX'],
+      chargeTypes: ['DETACHED'],
+      minutesToExpire: 10,
+      externalReference: ref,
+      callback: { cancelUrl: publicUrl, expiredUrl: publicUrl, successUrl: publicUrl },
+      items: [{ name: String(productName || 'Pedido Shadow Games').slice(0, 100), description: String(description).slice(0, 255), quantity: Number(quantity) || 1, value: Number(numericValue.toFixed(2)) }]
+    }, { headers, timeout: 15000 });
+    const checkoutId = response.data?.id;
+    if (!checkoutId) throw new Error('Asaas não retornou o ID do checkout.');
+    const checkoutUrl = `https://asaas.com/checkoutSession/show?id=${encodeURIComponent(checkoutId)}`;
+    recordCharge(ref, { provider: 'asaas', checkoutId, externalReference: ref, status: 'PENDING' });
+    return { id: checkoutId, checkoutUrl };
+  } catch (error) {
+    throw error.response ? asaasError(error, 'criar-checkout') : error;
+  }
+}
 async function getAsaasPayment(id) { const response = await axios.get(`${asaasBase()}/payments/${encodeURIComponent(id)}`, { headers: asaasHeaders(), timeout: 15000 }); return response.data; }
 function processWebhook(provider, body, signature) {
   ensure();
@@ -58,9 +82,10 @@ function processWebhook(provider, body, signature) {
   db.payment.events[eventId] = { provider, receivedAt: new Date().toISOString(), body };
   db.payment.lastEventAt = new Date().toISOString();
   const payment = body.payment || body;
-  const ref = payment.externalReference || body.txid || body.externalReference || body.external_reference || body.paymentId;
+  const checkout = body.checkout || {};
+  const ref = payment.externalReference || checkout.externalReference || body.txid || body.externalReference || body.external_reference || body.paymentId;
   const status = String(payment.status || body.event || 'PAID').toUpperCase();
-  const paid = ['RECEIVED', 'PAYMENT_RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(status);
+  const paid = ['RECEIVED', 'PAYMENT_RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH', 'CHECKOUT_PAID'].includes(status);
   if (ref && db.payment.charges[ref]) {
     db.payment.charges[ref].status = status;
     db.payment.charges[ref].providerId ||= payment.id;
@@ -73,4 +98,4 @@ function findChargeByProviderId(providerId) {
   return Object.values(db.payment.charges || {}).find(charge => String(charge.providerId) === String(providerId)) || null;
 }
 
-module.exports = { db, save, PROVIDERS, ensure, configured, select, status, createOrderRef, recordCharge, processWebhook, findChargeByProviderId, createAsaasPixCharge, getAsaasPayment };
+module.exports = { db, save, PROVIDERS, ensure, configured, select, status, createOrderRef, recordCharge, processWebhook, findChargeByProviderId, createAsaasPixCharge, createAsaasCheckout, getAsaasPayment };
