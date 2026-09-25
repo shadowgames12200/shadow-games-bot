@@ -37,9 +37,14 @@ async function DentroCarrinhoPix(interaction, client) {
         }
         const aaaa = valorNumerico.toFixed(2)
 
-        const providerStatus = paymentProviders.status();
+        let providerStatus = paymentProviders.status();
+        // A chave já está no ambiente do Render; inicializa o provedor no
+        // armazenamento local caso ele ainda não tenha sido selecionado.
+        if (!providerStatus.provider && paymentProviders.configured('asaas')) {
+            providerStatus = paymentProviders.select('asaas', process.env.ASAAS_MODE || 'sandbox');
+        }
         if (providerStatus.provider !== 'asaas' || !providerStatus.configured) {
-            throw new Error('Asaas não está configurado como banco operacional.');
+            throw new Error('Asaas não está configurado: verifique ASAAS_API_KEY no Render.');
         }
         const ref = paymentProviders.createOrderRef(interaction.channel.id);
         const paymentPromise = paymentProviders.createAsaasPixCharge({
