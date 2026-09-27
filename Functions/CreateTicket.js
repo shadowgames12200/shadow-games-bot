@@ -4,24 +4,17 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 const { configuracao, tickets, estatisticas } = require('../DataBaseJson');
+const { FORM_PREFIX, formCustomId, isSupportType, isSupportEntry, resolveFormEntry } = require('./TicketRouting');
 
 const aberturaCooldown = new Map();
-const FORM_PREFIX = 'ticket_open_form_';
-
-function normalize(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
-function isSupportType(value) {
-  const text = normalize(value);
-  return text === 'suporte ao cliente';
-}
-function formKind(value) { return isSupportType(value) ? 'support' : 'doubt'; }
-function formCustomId(value) { return `${FORM_PREFIX}${formKind(value)}`; }
 
 function openForm(valor) {
   const functions = tickets.get('tickets.funcoes') || {};
   const entry = functions[valor] ? [valor, functions[valor]] : Object.entries(functions).find(([key, item]) => String(item?.nome || key).trim() === String(valor).trim());
+  const resolvedKey = entry?.[0] || valor;
   const resolvedName = entry?.[1]?.nome || entry?.[0] || valor;
-  const support = isSupportType(resolvedName);
-  const modal = new ModalBuilder().setCustomId(formCustomId(resolvedName)).setTitle(support ? 'Suporte ao Cliente' : 'Dúvidas');
+  const support = isSupportEntry(entry) || isSupportType(resolvedName);
+  const modal = new ModalBuilder().setCustomId(formCustomId(resolvedKey)).setTitle(support ? 'Suporte ao Cliente' : 'Dúvidas');
   const fields = support ? [
     ['ticket_customer', 'Nome', 'Informe seu nome ou usuário', true],
     ['ticket_order', 'Nome ou ID do produto', 'Ex.: 123456 ou Plano de jogos', true],
@@ -46,7 +39,7 @@ async function CreateTicket(interaction, valor) {
   const resolvedKey = entry?.[0] || rawValue;
   const ggg = entry?.[1] || tickets.get(`tickets.funcoes.${rawValue}`);
   if (!ggg || !Object.keys(ggg).length) return interaction.reply({ content: '❌ | Essa função não existe!', ephemeral: true });
-  const support = isSupportType(ggg.nome || resolvedKey);
+  const support = isSupportEntry(entry || [resolvedKey, ggg]);
   const last = aberturaCooldown.get(interaction.user.id) || 0;
   if (Date.now() - last < 30000) return interaction.reply({ content: '⏳ | Aguarde alguns segundos antes de abrir outro ticket.', ephemeral: true });
   aberturaCooldown.set(interaction.user.id, Date.now());
@@ -134,14 +127,22 @@ function purchasesEmbed(userId, guildId) {
     .setColor('#5865f2');
 }
 async function createTicketFromModal(interaction) {
-  const formSupport = interaction.customId === `${FORM_PREFIX}support`;
+  const customId = String(interaction.customId || '');
+  const legacyKind = customId.startsWith(FORM_PREFIX) ? customId.slice(FORM_PREFIX.length) : '';
+  const functions = tickets.get('tickets.funcoes') || {};
+  const entry = resolveFormEntry(functions, customId);
+  if (!entry && legacyKind.startsWith('key_')) {
+    return interaction.reply({ content: '❌ A função deste formulário não existe mais. Abra um novo ticket pelo painel atualizado.', ephemeral: true });
+  }
+  if (!entry && legacyKind !== 'support' && legacyKind !== 'doubt') {
+    return interaction.reply({ content: '❌ Este formulário de ticket não é válido. Abra um novo ticket pelo painel.', ephemeral: true });
+  }
+  const formSupport = entry ? isSupportEntry(entry) : legacyKind === 'support';
   const cooldown = aberturaCooldown.get(interaction.user.id) || 0;
   if (Date.now() - cooldown < 30000) return interaction.reply({ content: '⏳ Aguarde alguns segundos antes de abrir outro ticket.', ephemeral: true });
   aberturaCooldown.set(interaction.user.id, Date.now());
   await interaction.deferReply({ ephemeral: true });
-  const functions = tickets.get('tickets.funcoes') || {};
-  const entry = Object.entries(functions).find(([key, item]) => formSupport ? isSupportType(item?.nome || key) : !isSupportType(item?.nome || key));
-  const support = formSupport && Boolean(entry && isSupportType(entry[1]?.nome || entry[0]));
+  const support = formSupport;
   const fallback = support
     ? ['Suporte ao Cliente', { nome: 'Suporte ao Cliente', descricao: 'Atendimento sobre compras, pagamentos, pedidos ou produtos.' }]
     : ['Dúvidas', { nome: 'Dúvidas', descricao: 'Perguntas sobre produtos, serviços, valores ou funcionamento da loja.' }];
