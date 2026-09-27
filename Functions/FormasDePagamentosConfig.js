@@ -10,7 +10,8 @@ async function FormasDePagamentos(interaction) {
   const embed = new EmbedBuilder()
     .setTitle('Configurar formas de pagamento')
     .setFields(
-      { name: 'Asaas', value: status.provider === 'asaas' ? `Selecionado (${status.mode})` : 'Não selecionado' },
+      { name: 'Efí Bank', value: status.provider === 'efi' ? `Selecionado (${status.mode})${status.configured ? ' · credenciais encontradas' : ' · credenciais pendentes'}` : 'Disponível para Pix' },
+      { name: 'Asaas', value: status.provider === 'asaas' ? `Selecionado (${status.mode})` : 'Disponível' },
       { name: 'Bancos bloqueados', value: bancosBloqueados }
     )
     .setColor(configuracao.get('Cores.Principal') || '0cd4cc')
@@ -22,6 +23,11 @@ async function FormasDePagamentos(interaction) {
   }
 
   const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('ajudaefi')
+      .setLabel('Como configurar Efí')
+      .setEmoji('🏦')
+      .setStyle(1),
     new ButtonBuilder()
       .setCustomId('configurarasaas')
       .setLabel('Configurar Asaas')
