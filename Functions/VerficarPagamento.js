@@ -11,16 +11,26 @@ async function processPayments(client) {
     const allPayments = pagamentos.fetchAll();
 
     for (const payment of allPayments) {
+        if (pedidos.has(payment.ID)) {
+            // Recover safely if the process restarted between queueing delivery
+            // and removing the payment record.
+            pagamentos.delete(payment.ID);
+            continue;
+        }
         const method = payment.data.pagamentos.method;
         const paymentDate = payment.data.pagamentos.data;
+        const tenMinutesLater = paymentDate + 10 * 60 * 1000;
 
         let threadChannel
         try {
             threadChannel = await client.channels.fetch(payment.ID);
 
-            const tenMinutesLater = paymentDate + 10 * 60 * 1000;
+            const savedProvider = payment.data.pagamentos.provider;
 
-            if (Date.now() > tenMinutesLater) {
+            // Efí first checks the authoritative API status before expiring a
+            // local order, so a payment completed while the bot was offline
+            // is not discarded when the bot comes back after ten minutes.
+            if (Date.now() > tenMinutesLater && savedProvider !== 'efi') {
 
                 await threadChannel.delete()
                 const texto = threadChannel.name;
@@ -63,17 +73,52 @@ async function processPayments(client) {
 
         if (method === 'pix' || method === 'pix_checkout') {
             let res;
-            const isAsaas = paymentProviders.status().provider === 'asaas';
+            const provider = payment.data.pagamentos.provider || (method === 'pix_checkout' ? 'asaas' : paymentProviders.status().provider);
+            const isEfi = provider === 'efi';
+            const isAsaas = provider === 'asaas';
             if (method === 'pix_checkout' && !isAsaas) {
                 console.warn('[Pagamentos] Checkout Asaas pendente, mas o provedor Asaas não está selecionado.');
                 continue;
             }
-            if (!isAsaas && payment.data.pagamentos.id !== `Aprovado Manualmente`) {
-                console.warn('[Pagamentos] Pagamento legado ignorado: Asaas não está selecionado.');
+            if (!isEfi && !isAsaas && payment.data.pagamentos.id !== `Aprovado Manualmente`) {
+                console.warn('[Pagamentos] Pagamento legado ignorado: nenhum provedor compatível está selecionado.');
                 continue;
             }
+            let efiPaid = false;
             if (payment.data.pagamentos.id !== `Aprovado Manualmente`) {
-                if (method === 'pix_checkout') {
+                if (isEfi) {
+                    const localCharge = paymentProviders.getChargeByReference(payment.data.pagamentos.ref);
+                    if (!localCharge || String(localCharge.providerId) !== String(payment.data.pagamentos.id)) {
+                        console.warn(`[Pagamentos/Efí] Cobrança não correlacionada para o pedido ${payment.ID}; fila preservada.`);
+                        continue;
+                    }
+                    try {
+                        res = { data: await paymentProviders.getEfiCharge(localCharge.providerId, localCharge.mode || 'sandbox') };
+                    } catch (error) {
+                        console.error(`[Pagamentos/Efí] Falha ao consultar cobrança ${localCharge.providerId}:`, error.message);
+                        continue;
+                    }
+                    efiPaid = paymentProviders.isEfiChargePaid(res.data, payment.data.pagamentos.value || localCharge.value);
+                    if (efiPaid) {
+                        localCharge.status = 'CONCLUIDA';
+                        localCharge.paidAt ||= new Date().toISOString();
+                        paymentProviders.save();
+                    } else if (String(res.data?.status || '').toUpperCase() === 'CONCLUIDA') {
+                        if (localCharge.status !== 'AMOUNT_MISMATCH') {
+                            console.error(`[Pagamentos/Efí] Cobrança ${localCharge.providerId} concluída com valor diferente do pedido ${payment.ID}; entrega suspensa para revisão manual.`);
+                        }
+                        localCharge.status = 'AMOUNT_MISMATCH';
+                        paymentProviders.save();
+                        continue;
+                    } else if (Date.now() > tenMinutesLater || ['REMOVIDA_PELO_USUARIO_RECEBEDOR', 'REMOVIDA_PELO_PSP'].includes(String(res.data?.status || '').toUpperCase())) {
+                        await threadChannel.delete().catch(() => {});
+                        pagamentos.delete(payment.ID);
+                        carrinhos.delete(payment.ID);
+                        continue;
+                    } else {
+                        continue;
+                    }
+                } else if (method === 'pix_checkout') {
                     const localCharge = paymentProviders.getChargeByReference(payment.data.pagamentos.ref);
                     res = { data: { status: localCharge?.status || 'PENDING' } };
                 } else {
@@ -88,7 +133,9 @@ async function processPayments(client) {
                         : { data: await paymentProviders.getAsaasPayment(payment.data.pagamentos.id) };
                 }
             }
-            const paid = isAsaas
+            const paid = isEfi
+                ? efiPaid
+                : isAsaas
                 ? asaasPaidStatuses.has(String(res?.data?.status || '').toUpperCase())
                 : res?.data?.status === 'approved';
             if (paid || payment.data.pagamentos.id == `Aprovado Manualmente`) {
@@ -129,10 +176,10 @@ async function processPayments(client) {
                 }
 
                 const lk = carrinhos.get(`${payment.ID}.replys`)
-                let bank = isAsaas ? 'Asaas' : res?.data?.point_of_interaction?.transaction_data?.bank_info?.payer?.long_name
+                let bank = isAsaas ? 'Asaas' : isEfi ? 'Efí Bank (Pix)' : res?.data?.point_of_interaction?.transaction_data?.bank_info?.payer?.long_name
 
 
-                if (!isAsaas && configuracao.get('pagamentos.BancosBloqueados') !== null) {
+                if (!isAsaas && !isEfi && configuracao.get('pagamentos.BancosBloqueados') !== null) {
                     const dd = await BloquearBanco(client, bank, payment.data.pagamentos.id, yy, msg)
 
                     const embed = new EmbedBuilder()
@@ -178,7 +225,7 @@ async function processPayments(client) {
                     }
 
                 }
-                const status = (payment.data.pagamentos.id === 'Aprovado Manualmente') ? 'Aprovado Manualmente' : (isAsaas ? 'RECEIVED' : (res.data.status === 'pending' ? 'AutoApproved' : Number(payment.data.pagamentos.id)));
+                const status = (payment.data.pagamentos.id === 'Aprovado Manualmente') ? 'Aprovado Manualmente' : (isEfi ? 'CONCLUIDA' : isAsaas ? 'RECEIVED' : (res.data.status === 'pending' ? 'AutoApproved' : Number(payment.data.pagamentos.id)));
                 pedidos.set(payment.ID, { id: status, method: method })
                 pagamentos.delete(payment.ID)
 
@@ -225,7 +272,7 @@ async function processPayments(client) {
 
 
 
-                const status2 = (payment.data.pagamentos.id === 'Aprovado Manualmente') ? 'Aprovado Manualmente' : (isAsaas ? 'PAYMENT_RECEIVED' : (res.data.status === 'pending' ? 'AutoApproved' : bank));
+                const status2 = (payment.data.pagamentos.id === 'Aprovado Manualmente') ? 'Aprovado Manualmente' : (isEfi ? 'PIX_RECEBIDO' : isAsaas ? 'PAYMENT_RECEIVED' : (res.data.status === 'pending' ? 'AutoApproved' : bank));
                 const dsfjmsdfjnsdfj222 = new EmbedBuilder()
                     .setColor(`${configuracao.get(`Cores.Sucesso`) == null ? `#40fc04` : configuracao.get(`Cores.Sucesso`)}`) //40fc04
                     .setAuthor({ name: `Pedido #${payment.data.pagamentos.id}` })
@@ -320,10 +367,5 @@ async function VerificarPagamento(client) {
 module.exports = {
     VerificarPagamento
 }
-
-
-
-
-
 
 

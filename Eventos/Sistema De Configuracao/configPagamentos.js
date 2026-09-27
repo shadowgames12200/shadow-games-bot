@@ -62,6 +62,18 @@ module.exports = {
             if (interaction.customId === 'voltaradawdwa') {
                 Gerenciar(interaction, client)
             }
+            if (interaction.customId === 'ajudaefi') {
+                return interaction.reply({
+                    content: [
+                        '**Efí Bank — configuração segura**',
+                        'No painel do seu host, configure `EFI_CLIENT_ID`, `EFI_CLIENT_SECRET` e `EFI_PIX_KEY`.',
+                        'Para o certificado, use `EFI_CERT_P12_BASE64` (P12 convertido para Base64) e, se houver senha, `EFI_CERT_P12_PASSWORD`. Também aceitamos par PEM em Base64 (`EFI_CERT_BASE64`/`EFI_KEY_BASE64`) ou caminhos de arquivos (`EFI_CERT_P12_PATH`, ou `EFI_CERT_PATH`/`EFI_KEY_PATH`).',
+                        'Defina `EFI_MODE=sandbox` para testes; produção só depois de validar a conta e o certificado. Reinicie o bot e selecione **Efí Bank** em `/profissional pagamento`.',
+                        'Não envie nem cole client secret, certificado, senha ou chave Pix neste Discord. O bot consulta o status confirmado diretamente na API da Efí; a entrega só ocorre após confirmar o valor total.'
+                    ].join('\n'),
+                    ephemeral: true
+                });
+            }
             if (interaction.customId === 'formasdepagamentos') {
                 FormasDePagamentos(interaction)
 

@@ -64,7 +64,7 @@ const command = new SlashCommandBuilder()
     .addStringOption(o => o.setName('equipe').setDescription('Chave da equipe').setRequired(true)))
   .addSubcommand(sub => sub.setName('pagamento').setDescription('Seleciona o provedor de pagamento em tempo de execução')
     .addStringOption(o => o.setName('provedor').setDescription('Provedor').setRequired(true).addChoices(
-      { name: 'Efí Bank', value: 'efi' }, { name: 'Banco Inter', value: 'inter' }, { name: 'Banco do Brasil', value: 'bb' }, { name: 'Asaas', value: 'asaas' }
+      { name: 'Efí Bank', value: 'efi' }, { name: 'Asaas', value: 'asaas' }
     ))
     .addStringOption(o => o.setName('modo').setDescription('Ambiente').setRequired(true).addChoices({ name: 'Sandbox/Teste', value: 'sandbox' }, { name: 'Produção', value: 'production' })));
 
@@ -93,6 +93,13 @@ module.exports = {
     if (sub === 'equipe') { const key = interaction.options.getString('chave').toLowerCase().replace(/[^a-z0-9-]/g, '-'); const role = interaction.options.getRole('cargo'); const category = interaction.options.getChannel('categoria'); db.teams[key] = { name: interaction.options.getString('nome'), roleId: role.id, categoryId: category?.id || db.settings.ticketCategoryId || '', enabled: true }; db.forms[key] ||= { title: `Atendimento ${db.teams[key].name}`, questions: ['Explique sua necessidade'], team: key }; save(); return interaction.reply({ content: `✅ Equipe **${db.teams[key].name}** configurada com a chave ${key}.`, ephemeral: true }); }
     if (sub === 'formulario') { const key = interaction.options.getString('equipe').toLowerCase(); if (!db.teams[key]) return interaction.reply({ content: '❌ Equipe não encontrada. Crie-a com `/profissional equipe`.', ephemeral: true }); const questions = interaction.options.getString('perguntas').split('|').map(x => x.trim()).filter(Boolean).slice(0, 5); if (!questions.length) return interaction.reply({ content: '❌ Informe pelo menos uma pergunta.', ephemeral: true }); db.forms[key] = { title: interaction.options.getString('titulo'), questions, team: key }; save(); return interaction.reply({ content: `✅ Formulário da equipe **${key}** atualizado com ${questions.length} pergunta(s).`, ephemeral: true }); }
     if (sub === 'painel-equipe') { const key = interaction.options.getString('equipe').toLowerCase(); if (!db.teams[key]) return interaction.reply({ content: '❌ Equipe não encontrada.', ephemeral: true }); const channel = interaction.options.getChannel('canal'); const cfg = db.teams[key]; const form = db.forms[key] || { title: `Atendimento ${cfg.name}` }; await channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle(form.title).setDescription(`Abra um atendimento diretamente com a equipe **${cfg.name}**.`)], components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`advanced_ticket_open:${key}`).setLabel(`Abrir com ${cfg.name}`).setEmoji('🎫').setStyle(ButtonStyle.Primary))] }); return interaction.reply({ content: `✅ Painel da equipe publicado em ${channel}.`, ephemeral: true }); }
-    if (sub === 'pagamento') { const result = payments.select(interaction.options.getString('provedor'), interaction.options.getString('modo')); return interaction.reply({ content: `✅ Provedor selecionado: **${result.name}** (${result.mode}).\nConfiguração encontrada: **${result.configured ? 'sim' : 'ainda não'}**.`, ephemeral: true }); }
+    if (sub === 'pagamento') {
+      try {
+        const result = payments.select(interaction.options.getString('provedor'), interaction.options.getString('modo'));
+        return interaction.reply({ content: `✅ Provedor selecionado: **${result.name}** (${result.mode}).\nConfiguração encontrada: **${result.configured ? 'sim' : 'ainda não'}**.`, ephemeral: true });
+      } catch (error) {
+        return interaction.reply({ content: `❌ ${error.message}`, ephemeral: true });
+      }
+    }
   }
 };
