@@ -288,15 +288,7 @@ module.exports = {
             }
         }
 
-        let valorticket
-        if (interaction.isButton() && interaction.customId.startsWith('AbrirTicket_')) {
-            valorticket = interaction.customId.replace('AbrirTicket_', '');
-            CreateTicket(interaction, valorticket)
-        } else if (interaction.isSelectMenu() && interaction.customId === 'abrirticket') {
-            valorticket = interaction.values[0]
-            CreateTicket(interaction, valorticket)
-        }
-
+        
         if (interaction.isSelectMenu()) {
 
             if(interaction.customId == 'asdihadbhawhdwhdaw'){
