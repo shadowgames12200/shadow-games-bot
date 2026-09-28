@@ -71,6 +71,9 @@ async function start() {
   installSecurity(client);
   installLogs(client);
   installLegacyTicketStaff(client);
+  // The bot intentionally has several feature modules subscribed to interactions.
+  // Keep Node from treating the modular dispatcher as an accidental leak.
+  client.setMaxListeners(20);
   ensurePayments();
 
   await client.login(token);
