@@ -1,6 +1,7 @@
 const { RoleSelectMenuBuilder, ActionRowBuilder, ButtonBuilder, ChannelSelectMenuBuilder, ChannelType } = require("discord.js");
 const { configuracao } = require("../../DataBaseJson");
 const { ConfigRoles, ConfigChannels } = require("../../Functions/ConfigRoles");
+const { syncPanelChannel } = require("../../LogSuite");
 
 module.exports = {
     name: 'interactionCreate',
@@ -363,26 +364,31 @@ module.exports = {
             if (interaction.customId == 'systemlogs') {
                 const channel = interaction.values[0]
                 configuracao.set(`ConfigChannels.systemlogs`, channel)
+                syncPanelChannel(interaction.guild.id, 'systemlogs', channel)
                 ConfigChannels(interaction, client)
             }
             if (interaction.customId == 'logentrada') {
                 const channel = interaction.values[0]
                 configuracao.set(`ConfigChannels.entradas`, channel)
+                syncPanelChannel(interaction.guild.id, 'logentrada', channel)
                 ConfigChannels(interaction, client)
             }
             if (interaction.customId == 'logsaida') {
                 const channel = interaction.values[0]
                 configuracao.set(`ConfigChannels.saídas`, channel)
+                syncPanelChannel(interaction.guild.id, 'logsaida', channel)
                 ConfigChannels(interaction, client)
             }
             if (interaction.customId == 'logmensagem') {
                 const channel = interaction.values[0]
                 configuracao.set(`ConfigChannels.mensagens`, channel)
+                syncPanelChannel(interaction.guild.id, 'logmensagem', channel)
                 ConfigChannels(interaction, client)
             }
             if (interaction.customId == 'trafegocall') {
                 const channel = interaction.values[0]
                 configuracao.set(`ConfigChannels.tráfego`, channel)
+                syncPanelChannel(interaction.guild.id, 'trafegocall', channel)
                 ConfigChannels(interaction, client)
             }
             if (interaction.customId == 'feedback') {
