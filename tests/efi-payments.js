@@ -6,7 +6,7 @@ const payments = require('../PaymentProviders');
 
 async function main() {
   const envNames = [
-    'EFI_MODE', 'EFI_CLIENT_ID', 'EFI_CLIENT_SECRET', 'EFI_PIX_KEY',
+    'EFI_CLIENT_ID', 'EFI_CLIENT_SECRET', 'EFI_PIX_KEY',
     'EFI_CERT_P12_BASE64', 'EFI_CERT_P12_PASSWORD', 'EFI_CERT_P12_PATH',
     'EFI_CERT_BASE64', 'EFI_KEY_BASE64', 'EFI_CERT_PATH', 'EFI_KEY_PATH'
   ];
@@ -20,7 +20,6 @@ async function main() {
 
   try {
     for (const name of envNames) delete process.env[name];
-    process.env.EFI_MODE = 'sandbox';
     payments.db.payment = { provider: '', mode: 'sandbox', charges: {}, events: {} };
     assert.equal(payments.configured('efi'), false);
     assert.throws(() => payments.select('efi', 'production'), /Configure as credenciais/);
