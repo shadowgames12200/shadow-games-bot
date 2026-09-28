@@ -22,7 +22,6 @@ Este fluxo consulta o status diretamente na API Efí e não depende do webhook d
 
 Configure no painel de variáveis/secrets do host — não no Discord, GitHub, mensagens ou arquivo versionado:
 
-- `EFI_MODE=sandbox` (comece assim; produção usa `production`)
 - `EFI_CLIENT_ID`
 - `EFI_CLIENT_SECRET`
 - `EFI_PIX_KEY` (chave Pix cadastrada na conta Efí)
@@ -43,12 +42,14 @@ Alternativas se o host oferece armazenamento de arquivos secretos:
 
 Não compartilhe nem publique esses valores. Se um secret tiver sido exposto, revogue/regenere-o na Efí.
 
-## Ativar no Discord
+## Selecionar no painel do Discord
 
 1. Reinicie/reimplante o bot para carregar os secrets.
-2. Um administrador executa `/profissional pagamento`, escolhe **Efí Bank** e **Sandbox/Teste**.
+2. Abra `/botconfig` → **Definições** → **Formas de pagamento** e selecione **Efí Bank · Sandbox/Teste**.
 3. Faça uma compra de teste com a homologação; confirme que o QR e o Pix Copia e Cola aparecem e que a entrega só acontece após a API retornar o pagamento concluído.
-4. Depois de concluir a configuração/validação da Efí, configure as variáveis de produção, selecione **Efí Bank / Produção** e faça um pagamento real de baixo valor antes de abrir as vendas.
+4. Depois de concluir a configuração/validação da Efí, substitua no host as credenciais e o certificado pelos de produção e selecione **Efí Bank · Produção** no mesmo painel. O bot pedirá uma confirmação explícita porque novas cobranças serão reais.
+
+O ambiente é salvo pelo painel no armazenamento persistente do bot. A variável `EFI_MODE` não é lida pelo código. Não misture credenciais ou certificados de homologação e produção.
 
 A opção **Como configurar Efí** no painel de pagamentos do Discord mostra os nomes das variáveis, mas nunca armazena o client secret nem o certificado.
 
