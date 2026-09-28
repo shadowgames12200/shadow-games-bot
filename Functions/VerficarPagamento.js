@@ -186,7 +186,7 @@ async function processPayments(client) {
                         .setColor(`${configuracao.get(`Cores.Erro`) == null ? `#ff0000` : configuracao.get(`Cores.Erro`)}`)
                         .setAuthor({ name: `Pedido #${payment.ID}` })
                         .setTitle(`Pedido não aprovado`)
-                        .setDescription(`A Wolf Store não está aceitando pagamentos desta instituição \`${bank}\`, seu dinheiro foi reembolsado, abra um ticket para realizar este pagamento.`)
+                        .setDescription(`A Shadow Games não está aceitando pagamentos desta instituição \`${bank}\`, seu dinheiro foi reembolsado, abra um ticket para realizar este pagamento.`)
                         .addFields(
                             { name: `Detalhes`, value: `\`${yy.quantidadeselecionada}x ${yy.infos.produto} - ${yy.infos.campo} | R$ ${Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`` }
                         )
