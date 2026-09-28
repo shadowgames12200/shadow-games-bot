@@ -50,7 +50,19 @@ function config() {
 }
 
 function threadOwner(thread) {
-  return String(thread?.ownerId || String(thread?.name || '').split('・').pop() || '');
+  const key = thread?.id ? `tickets.threadOwners.${thread.id}` : '';
+  const persistedOwner = key ? String(tickets.get(key) || '') : '';
+  if (/^\d{17,20}$/.test(persistedOwner)) return persistedOwner;
+
+  const nameOwner = String(thread?.name || '').split('・').pop() || '';
+  if (/^\d{17,20}$/.test(nameOwner)) {
+    // Migrate older tickets on first use; DataBaseJson writes this to the local JSON store.
+    if (key && nameOwner !== persistedOwner) tickets.set(key, nameOwner);
+    return nameOwner;
+  }
+
+  const discordOwner = String(thread?.ownerId || '');
+  return /^\d{17,20}$/.test(discordOwner) ? discordOwner : '';
 }
 
 function isLegacyThread(channel) {
