@@ -116,7 +116,7 @@ async function EntregarPagamentos(client) {
                 .setColor(`${configuracao.get(`Cores.Sucesso`) == null ? `#7464ff` : configuracao.get(`Cores.Sucesso`)}`) //7464ff
                 .setAuthor({ name: `Pedido #${entrega.data.id}` })
                 .setTitle(`<:Posse:1350639278081970227> Entrega Realizada`)
-                .setDescription(`<a:star_wolf:1344764324060725330> Seu produto foi anexado a essa mensagem`)
+                .setDescription(`🎮 Shadow Games • Seu produto foi anexado a essa mensagem`)
                 .addFields(
                     { name: `**Detalhes**`, value: `\`${yy.quantidadeselecionada}x ${yy.infos.produto} - ${yy.infos.campo} | R$ ${Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`` },
 
