@@ -1,0 +1,17 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const root = require('node:path').join(__dirname, '..');
+const cart = fs.readFileSync(`${root}/Functions/DentroCarrinho.js`, 'utf8');
+const handler = fs.readFileSync(`${root}/Eventos/Sistema De Configuracao/createCarrinho.js`, 'utf8');
+const providers = fs.readFileSync(`${root}/PaymentProviders.js`, 'utf8');
+assert(cart.includes("setCustomId('pagarpix')"));
+assert(cart.includes("setCustomId('pagarcartao')"));
+assert(cart.includes("setCustomId('pagarinternacional')"));
+assert(cart.includes("setCustomId('voltarcarrinho')"));
+assert(cart.includes('REVOLUT_EUR_DETAILS'));
+assert(cart.includes('REVOLUT_USD_DETAILS'));
+assert(handler.includes("customId == 'comprovanteinternacional'"));
+assert(providers.includes('createEfiPaymentLink'));
+assert(providers.includes('cobrancas.api.efipay.com.br'));
+console.log('payment-options=ok');
