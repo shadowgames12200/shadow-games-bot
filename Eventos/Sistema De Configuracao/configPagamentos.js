@@ -4,13 +4,68 @@ const { Gerenciar } = require("../../Functions/Gerenciar");
 const { FormasDePagamentos } = require("../../Functions/FormasDePagamentosConfig");
 const payments = require('../../PaymentProviders');
 const { msgbemvindo } = require("../../Functions/MensagemBemVindo");
+const { owner } = require("../../config.json");
 
 module.exports = {
     name: 'interactionCreate',
 
     run: async (interaction, client) => {
 
+        if (interaction.isStringSelectMenu?.() && interaction.customId === 'payment_provider_select') {
+            if (interaction.user.id !== owner) {
+                return interaction.reply({ content: '❌ Você não tem permissão para alterar o provedor de pagamentos.', ephemeral: true });
+            }
+            const [provider, mode] = String(interaction.values?.[0] || '').split(':');
+            if (!['efi', 'asaas'].includes(provider) || !['sandbox', 'production'].includes(mode)) {
+                return interaction.reply({ content: '❌ Opção de pagamento inválida.', ephemeral: true });
+            }
+            if (mode === 'production') {
+                const confirmRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`confirm_payment_provider:${provider}:production`)
+                        .setLabel('Confirmar Produção')
+                        .setStyle(4),
+                    new ButtonBuilder()
+                        .setCustomId('cancel_payment_provider')
+                        .setLabel('Cancelar')
+                        .setStyle(2)
+                );
+                const providerName = provider === 'efi' ? 'Efí Bank' : 'Asaas';
+                return interaction.update({
+                    content: `⚠️ **Confirme a ativação de ${providerName} em PRODUÇÃO.** Depois de ativado, o bot poderá criar cobranças reais para novos pedidos. Esta confirmação não cria uma cobrança agora.`,
+                    embeds: [],
+                    components: [confirmRow]
+                });
+            }
+            try {
+                payments.select(provider, mode);
+                return FormasDePagamentos(interaction);
+            } catch (error) {
+                return interaction.reply({ content: `❌ ${error.message}`, ephemeral: true });
+            }
+        }
+
         if (interaction.isButton()) {
+
+            if (interaction.customId.startsWith('confirm_payment_provider:')) {
+                if (interaction.user.id !== owner) {
+                    return interaction.reply({ content: '❌ Você não tem permissão para alterar o provedor de pagamentos.', ephemeral: true });
+                }
+                const [, provider, mode] = interaction.customId.split(':');
+                try {
+                    payments.select(provider, mode);
+                    return FormasDePagamentos(interaction);
+                } catch (error) {
+                    return interaction.reply({ content: `❌ ${error.message}`, ephemeral: true });
+                }
+            }
+
+            if (interaction.customId === 'cancel_payment_provider') {
+                if (interaction.user.id !== owner) {
+                    return interaction.reply({ content: '❌ Você não tem permissão para alterar o provedor de pagamentos.', ephemeral: true });
+                }
+                return FormasDePagamentos(interaction);
+            }
 
 
             if (interaction.customId === 'editarmensagemboasvindas') {
@@ -66,9 +121,10 @@ module.exports = {
                 return interaction.reply({
                     content: [
                         '**Efí Bank — configuração segura**',
-                        'No painel do seu host, configure `EFI_CLIENT_ID`, `EFI_CLIENT_SECRET` e `EFI_PIX_KEY`.',
-                        'Para o certificado, use `EFI_CERT_P12_BASE64` (P12 convertido para Base64) e, se houver senha, `EFI_CERT_P12_PASSWORD`. Também aceitamos par PEM em Base64 (`EFI_CERT_BASE64`/`EFI_KEY_BASE64`) ou caminhos de arquivos (`EFI_CERT_P12_PATH`, ou `EFI_CERT_PATH`/`EFI_KEY_PATH`).',
-                        'Defina `EFI_MODE=sandbox` para testes; produção só depois de validar a conta e o certificado. Reinicie o bot e selecione **Efí Bank** em `/profissional pagamento`.',
+                        'No Render, configure `EFI_CLIENT_ID`, `EFI_CLIENT_SECRET`, `EFI_PIX_KEY` e `EFI_CERT_P12_BASE64`; use `EFI_CERT_P12_PASSWORD` somente se o P12 tiver senha.',
+                        'Na aplicação Efí, habilite os escopos `cob.write` e `cob.read`. Use credenciais e certificado do mesmo ambiente.',
+                        'Reimplante o bot e selecione o provedor e o ambiente no menu **Definições → Formas de pagamento**. Não é necessário definir `EFI_MODE`.',
+                        'Comece em Sandbox/Teste. Para Produção, troque no Render para as credenciais e certificado de produção antes de selecionar o ambiente de Produção.',
                         'Não envie nem cole client secret, certificado, senha ou chave Pix neste Discord. O bot consulta o status confirmado diretamente na API da Efí; a entrega só ocorre após confirmar o valor total.'
                     ].join('\n'),
                     ephemeral: true
