@@ -8,6 +8,10 @@ const db = new QuickDB();
 const paymentCreationInProgress = new Set();
 const REVOLUT_EUR = process.env.REVOLUT_EUR_DETAILS || 'Configure REVOLUT_EUR_DETAILS no Render.';
 const REVOLUT_USD = process.env.REVOLUT_USD_DETAILS || 'Configure REVOLUT_USD_DETAILS no Render.';
+const EMOJI_PIX = process.env.EMOJI_PIX || { id: '1554175847601147966', name: 'emoji_42' };
+const EMOJI_CARD = process.env.EMOJI_CARD || { id: '1554175727937527818', name: 'emoji_41' };
+const EMOJI_CURRENCY = process.env.EMOJI_CURRENCY || { id: '1554176158835277875', name: 'emoji_43' };
+const EMOJI_BACK = process.env.EMOJI_BACK || { id: '1554175586589614260', name: 'emoji_40' };
 
 
 async function DentroCarrinhoPix(interaction, client) {
@@ -108,10 +112,10 @@ async function DentroCarrinhoPix(interaction, client) {
     } catch (error) {
         console.error('[Pagamento] Falha ao criar Pix:', error.message);
         const row3 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('pagarpix').setLabel('Pix').setEmoji(process.env.EMOJI_PIX || '💠').setStyle(3),
-            new ButtonBuilder().setCustomId('pagarcartao').setLabel('Cartão de crédito').setEmoji(process.env.EMOJI_CARD || '💳').setStyle(1),
-            new ButtonBuilder().setCustomId('pagarinternacional').setLabel('Dólar/Euro').setEmoji(process.env.EMOJI_CURRENCY || '💵').setStyle(1),
-            new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(process.env.EMOJI_BACK || '⬅️').setStyle(2)
+            new ButtonBuilder().setCustomId('pagarpix').setLabel('Pix').setEmoji(EMOJI_PIX).setStyle(3),
+            new ButtonBuilder().setCustomId('pagarcartao').setLabel('Cartão de crédito').setEmoji(EMOJI_CARD).setStyle(1),
+            new ButtonBuilder().setCustomId('pagarinternacional').setLabel('Dólar/Euro').setEmoji(EMOJI_CURRENCY).setStyle(1),
+            new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(EMOJI_BACK).setStyle(2)
         )
         await tt.edit({ content: 'Selecione uma forma de pagamento.', components: [row3], embeds: [] }).catch(() => {})
         await interaction.followUp({ content: '❌ | Não foi possível criar a cobrança Pix. Verifique as credenciais/certificado do provedor ou tente novamente mais tarde.', ephemeral: true }).catch(() => {})
@@ -145,7 +149,7 @@ async function DentroCarrinhoCard(interaction) {
             .setFooter({ text: `${interaction.guild.name} - Link da Efí` }).setTimestamp();
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setLabel('Abrir pagamento Efí').setStyle(5).setURL(link.paymentUrl),
-            new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(process.env.EMOJI_BACK || '⬅️').setStyle(2)
+            new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(EMOJI_BACK).setStyle(2)
         );
         carrinhos.set(`${channelId}.pagamentos`, { id: link.id, ref, method: 'credit_card', provider: 'efi', paymentUrl: link.paymentUrl });
         pagamentos.set(`${channelId}.pagamentos`, { id: link.id, ref, method: 'credit_card', provider: 'efi', value: valor.toFixed(2), data: Date.now() });
@@ -174,7 +178,7 @@ async function DentroCarrinhoInternational(interaction) {
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('comprovanteinternacional').setLabel('Enviei o comprovante').setEmoji('📎').setStyle(3),
         new ButtonBuilder().setCustomId('confirmarpagamentomanual').setLabel('Aprovar após conferir').setStyle(3),
-        new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(process.env.EMOJI_BACK || '⬅️').setStyle(2)
+        new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(EMOJI_BACK).setStyle(2)
     );
     await interaction.message.edit({ content: `<@${interaction.user.id}>`, embeds: [embed], components: [row] });
 }
@@ -195,10 +199,10 @@ async function DentroCarrinho2(interaction) {
 
 
     const row3 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('pagarpix').setLabel('Pix').setEmoji(process.env.EMOJI_PIX || '💠').setStyle(3),
-        new ButtonBuilder().setCustomId('pagarcartao').setLabel('Cartão de crédito').setEmoji(process.env.EMOJI_CARD || '💳').setStyle(1),
-        new ButtonBuilder().setCustomId('pagarinternacional').setLabel('Dólar/Euro').setEmoji(process.env.EMOJI_CURRENCY || '💵').setStyle(1),
-        new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(process.env.EMOJI_BACK || '⬅️').setStyle(2)
+        new ButtonBuilder().setCustomId('pagarpix').setLabel('Pix').setEmoji(EMOJI_PIX).setStyle(3),
+        new ButtonBuilder().setCustomId('pagarcartao').setLabel('Cartão de crédito').setEmoji(EMOJI_CARD).setStyle(1),
+        new ButtonBuilder().setCustomId('pagarinternacional').setLabel('Dólar/Euro').setEmoji(EMOJI_CURRENCY).setStyle(1),
+        new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(EMOJI_BACK).setStyle(2)
     )
 
     await interaction.message.edit({ content: `Selecione uma forma de pagamento.`, components: [row3], embeds: [] })
