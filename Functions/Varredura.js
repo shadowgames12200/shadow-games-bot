@@ -12,8 +12,8 @@ async function Varredura(client) {
     const embed3 = new EmbedBuilder()
         .setColor('#1c44ff')
         .setTitle(`🚨 Varredura Anti-Fraude`)
-        .setDescription(`O bot da Wolf Store está realizando uma varredura matinal nos pagamentos para verificar a existência de quaisquer reembolsos suspeitos.`)
-        .setFooter({ iconURL: `https://media.discordapp.net/attachments/1326580051205947513/1329584298533064754/Wolf_Store_-_LOGOTIPO.jpg`, text: `Sistema Anti-Fraude - Wolf Applications.` })
+        .setDescription(`O bot da Shadow Games está realizando uma varredura matinal nos pagamentos para verificar a existência de quaisquer reembolsos suspeitos.`)
+        .setFooter({ text: `Sistema Anti-Fraude - Shadow Games.` })
         .setTimestamp();
 
     const row222 = new ActionRowBuilder()
