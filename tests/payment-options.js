@@ -24,6 +24,16 @@ assert(cart.includes("setCustomId('pagarpix')"));
 assert(cart.includes("setCustomId('pagarcartao')"));
 assert(cart.includes("setCustomId('pagarinternacional')"));
 assert(cart.includes("setCustomId('voltarcarrinho')"));
+const buttonEmojis = [
+    ['EMOJI_PIX', '1554175847601147966', 'emoji_42', 'pagarpix'],
+    ['EMOJI_CARD', '1554175727937527818', 'emoji_41', 'pagarcartao'],
+    ['EMOJI_CURRENCY', '1554176158835277875', 'emoji_43', 'pagarinternacional'],
+    ['EMOJI_BACK', '1554175586589614260', 'emoji_40', 'voltarcarrinho']
+];
+for (const [variable, id, name, customId] of buttonEmojis) {
+    assert(cart.includes(`const ${variable} = process.env.${variable} || { id: '${id}', name: '${name}' };`), `${variable} must use the selected server emoji`);
+    assert(new RegExp(`setCustomId\\('${customId}'\\)[^\\n]*\\.setEmoji\\(${variable}\\)`).test(cart), `${customId} must use ${variable}`);
+}
 assert(cart.includes('REVOLUT_EUR_DETAILS'));
 assert(cart.includes('REVOLUT_USD_DETAILS'));
 assert(handler.includes("customId == 'comprovanteinternacional'"));
