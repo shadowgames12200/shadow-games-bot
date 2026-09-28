@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder } = require("discord.js");
+const { EmbedBuilder } = require("discord.js");
 const { pagamentos, carrinhos, pedidos, produtos, configuracao } = require("../DataBaseJson")
 const { BloquearBanco } = require("./BloquearBanco");
 const { CheckPosition } = require("./PosicoesFunction");
@@ -309,24 +309,11 @@ async function processPayments(client) {
                     .setTimestamp()
 
 
-                const row222 = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`refoundd_${payment.data.pagamentos.id}`)
-                            .setLabel('Extornar')
-                            .setStyle(2)
-                            .setEmoji(`1187468970891169853`)
-                            .setDisabled(res?.data?.status == 'approved' ? false : true)
-                    );
-
-
-
-
                 try {
                     const channela = await client.channels.fetch(lk.channelid);
 
                     const yuyu = await channela.messages.fetch(lk.idmsg)
-                    yuyu.reply({ embeds: [dsfjmsdfjnsdfj222], components: [row222] }).then(aaaaa => {
+                    yuyu.reply({ embeds: [dsfjmsdfjnsdfj222] }).then(aaaaa => {
                         carrinhos.set(`${payment.ID}.replys`, { channelid: aaaaa.channel.id, idmsg: aaaaa.id })
                     })
                 } catch (error) {
@@ -388,4 +375,3 @@ async function VerificarPagamento(client) {
 module.exports = {
     VerificarPagamento
 }
-

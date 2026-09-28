@@ -1,7 +1,7 @@
 
 const Discord = require("discord.js")
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js")
-const { produtos, configuracao } = require("../../DataBaseJson");
+const { EmbedBuilder, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js")
+const { produtos } = require("../../DataBaseJson");
 const { QuickDB } = require("quick.db");
 const { GerenciarCampos, GerenciarCampos2 } = require("../../Functions/GerenciarCampos");
 const { MessageStock } = require("../../Functions/ConfigEstoque.js");
@@ -103,54 +103,16 @@ module.exports = {
             }
 
 
-            if (interaction.customId.startsWith('wdawdawdawdwadadsadawdwadwdw')) {
-
-                let a1 = interaction.fields.getTextInputValue('tokenMP');
-                if (a1 !== 'sim') return interaction.reply({ content: `❌ | Ação não validada para realizar reembolso.`, ephemeral: true })
-                const id = interaction.customId.split('_')[1]
-
-                await interaction.reply({ content: `✅ | Estornando pagamento...`, ephemeral: true })
-
-                const axios = require('axios');
-                const refundResponse = await axios.post(`https://api.mercadopago.com/v1/payments/${id}/refunds`, {}, {
-                    headers: {
-                        'Authorization': `Bearer ${configuracao.get('pagamentos.MpAPI')}`
-                    }
-                });
-
-                interaction.message.edit({ content: `✅ | Pagamento estornado com sucesso. ( Responsavel: ${interaction.user} )`, components: [] })
-                interaction.editReply({ content: `✅ | Pagamento estornado com sucesso. ( Responsavel: ${interaction.user} )` })
-            }
-
         }
 
 
         if (interaction.isButton()) {
 
             if (interaction.customId.startsWith('refoundd_')) {
-
-                const modalaAA = new ModalBuilder()
-                    .setCustomId(`wdawdawdawdwadadsadawdwadwdw_${interaction.customId.split('_')[1]}`)
-                    .setTitle(`Estorno de pagamento`);
-
-                const newnameboteN = new TextInputBuilder()
-                    .setCustomId('tokenMP')
-                    .setLabel(`Confirmação de estorno`)
-                    .setPlaceholder(`digite 'sim' para confirmar.`)
-                    .setStyle(TextInputStyle.Short)
-                    .setRequired(true)
-
-
-                const firstActionRow3 = new ActionRowBuilder().addComponents(newnameboteN)
-
-
-                modalaAA.addComponents(firstActionRow3);
-                await interaction.showModal(modalaAA);
-
-
-
-
-
+                return interaction.reply({
+                    content: 'Este botão antigo de estorno foi desativado. Faça a solicitação diretamente ao provedor de pagamento.',
+                    ephemeral: true
+                });
             }
 
 

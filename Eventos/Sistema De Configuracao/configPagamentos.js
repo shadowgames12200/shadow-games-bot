@@ -111,7 +111,7 @@ module.exports = {
 
 
             if (interaction.customId == '+18porra' || interaction.customId == '-18porra' || interaction.customId == 'configurarmercadopago') {
-                return interaction.reply({ content: '❌ Mercado Pago foi desativado. Configure e use somente o Asaas.', ephemeral: true });
+                return interaction.reply({ content: '❌ Mercado Pago foi desativado. Configure a Efí Bank em Definições → Formas de pagamento.', ephemeral: true });
             }
 
             if (interaction.customId === 'voltaradawdwa') {
