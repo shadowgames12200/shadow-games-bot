@@ -4,11 +4,8 @@ const { EVENTS, setChannel, status } = require('../../LogSuite');
 const choices = Object.entries(EVENTS).map(([value, name]) => ({ name, value }));
 const data = new SlashCommandBuilder()
  .setName('logs')
- .setDescription('Configura um canal separado para cada evento')
+ .setDescription('Consulta as configurações de logs; configure os canais pelo /botconfig')
  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild.bitfield)
- .addSubcommand(sub => sub.setName('canal').setDescription('Define o canal de um evento')
-   .addStringOption(option => option.setName('evento').setDescription('Evento que será registrado').setRequired(true).addChoices(...choices))
-   .addChannelOption(option => option.setName('canal').setDescription('Canal de destino').setRequired(true).addChannelTypes(ChannelType.GuildText)))
  .addSubcommand(sub => sub.setName('remover').setDescription('Remove a configuração de um evento')
    .addStringOption(option => option.setName('evento').setDescription('Evento').setRequired(true).addChoices(...choices)))
  .addSubcommand(sub => sub.setName('status').setDescription('Mostra todos os eventos configurados'));
@@ -19,12 +16,6 @@ module.exports = {
  run: async (_client, interaction) => {
    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Você precisa de Gerenciar Servidor.', ephemeral: true });
    const sub = interaction.options.getSubcommand();
-   if (sub === 'canal') {
-     const event = interaction.options.getString('evento');
-     const channel = interaction.options.getChannel('canal');
-     setChannel(interaction.guild.id, event, channel.id);
-     return interaction.reply({ content: `✅ **${EVENTS[event]}** será registrado em ${channel}.`, ephemeral: true });
-   }
    if (sub === 'remover') {
      const event = interaction.options.getString('evento');
      setChannel(interaction.guild.id, event, null);
