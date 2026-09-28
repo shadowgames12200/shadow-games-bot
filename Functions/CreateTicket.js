@@ -68,6 +68,7 @@ async function CreateTicket(interaction, valor) {
       { id: interaction.user.id, allow: [PermissionFlagsBits.SendMessagesInThreads] }
     ]
   });
+  tickets.set(`tickets.threadOwners.${thread.id}`, String(interaction.user.id));
   const rowLink = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${thread.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
   await interaction.editReply({ content: '✅ Ticket criado com sucesso!', components: [rowLink] });
   const appearance = tickets.get('tickets.aparencia') || {};
@@ -164,6 +165,7 @@ async function createTicketFromModal(interaction) {
       { id: interaction.user.id, allow: [PermissionFlagsBits.SendMessagesInThreads] }
     ].filter(x => x.id)
   });
+  tickets.set(`tickets.threadOwners.${thread.id}`, String(interaction.user.id));
   const appearance = tickets.get('tickets.aparencia') || {};
   const embed = new EmbedBuilder().setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) }).setTitle(ggg.nome || key)
     .setDescription(ggg.descricao || ggg.predescricao || 'Atendimento').addFields(
