@@ -7,7 +7,7 @@ const { GerenciarCampos, GerenciarCampos2 } = require("../../Functions/Gerenciar
 const { MessageStock } = require("../../Functions/ConfigEstoque.js");
 const { MessageCreate } = require("../../Functions/SenderMessagesOrUpdates");
 const { VerificaçõesCarrinho, CreateCarrinho } = require("../../Functions/CreateCarrinho");
-const { DentroCarrinho1, DentroCarrinho2, DentroCarrinhoPix } = require("../../Functions/DentroCarrinho");
+const { DentroCarrinho1, DentroCarrinho2, DentroCarrinhoPix, DentroCarrinhoCard, DentroCarrinhoInternational } = require("../../Functions/DentroCarrinho");
 const { VerificarCupom, AplicarCupom } = require("../../Functions/VerificarCupom");
 const { getPermissions } = require("../../Functions/PermissionsCache.js");
 const db = new QuickDB();
@@ -101,6 +101,19 @@ module.exports = {
 
             if (interaction.customId == 'pagarpix') {
                 DentroCarrinhoPix(interaction, client)
+            }
+
+            if (interaction.customId == 'pagarcartao') {
+                DentroCarrinhoCard(interaction)
+            }
+
+            if (interaction.customId == 'pagarinternacional') {
+                DentroCarrinhoInternational(interaction)
+            }
+
+            if (interaction.customId == 'comprovanteinternacional') {
+                await interaction.reply({ content: '✅ Agora envie a imagem/PDF do comprovante como anexo neste canal e aguarde a conferência da equipe.', ephemeral: true })
+                await interaction.channel.send({ content: `📎 ${interaction.user} informou que enviará o comprovante do pagamento internacional. Confirme o recebimento antes de aprovar.` })
             }
 
             if (interaction.customId == 'voltarcarrinho') {
