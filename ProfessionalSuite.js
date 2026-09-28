@@ -49,8 +49,6 @@ async function handleInteraction(interaction, client) {
 }
 function install(client) {
   client.on(Events.MessageCreate, m => handleMessage(m, client));
-  client.on(Events.MessageDelete, m => { if (m.guild && !m.author?.bot) log(client, m.guild, 'Mensagem apagada', `Canal: ${m.channel}\nAutor: ${m.author || 'desconhecido'}\nConteúdo: ${m.content || '*indisponível*'}`, 0xed4245); });
-  client.on(Events.MessageUpdate, (before, after) => { if (after.guild && !after.author?.bot && before.content !== after.content) log(client, after.guild, 'Mensagem editada', `Canal: ${after.channel}\nAutor: ${after.author}\nAntes: ${before.content || '*vazio*'}\nDepois: ${after.content || '*vazio*'}`, 0xfee75c); });
   client.on(Events.InteractionCreate, i => handleInteraction(i, client).catch(e => { recordError(e, { type: 'interaction', customId: i.customId, command: i.commandName }); if (!i.replied && !i.deferred) i.reply({ content: '❌ Ocorreu um erro temporário. Tente novamente.', ephemeral: true }).catch(() => {}); }));
   client.on(Events.MessageReactionAdd, async (reaction, user) => {
     const cfg = db.reactionRoles[reaction.message.id]?.[reaction.emoji.id || reaction.emoji.name];

@@ -11,6 +11,8 @@ function eventKey(value) { const key = String(value || '').toLowerCase(); return
 function ensure() { db.serverLogs ||= {}; }
 function configFor(guildId) { ensure(); db.serverLogs[guildId] ||= { channelId: '', enabled: true, channels: {} }; db.serverLogs[guildId].channels ||= {}; return db.serverLogs[guildId]; }
 function setChannel(guildId, event, channelId) { const config = configFor(guildId); const key = eventKey(event); if (channelId) config.channels[key] = channelId; else delete config.channels[key]; save(); return config; }
+const PANEL_EVENT_MAP = { logentrada: ['membro_entrada'], logsaida: ['membro_saida'], logmensagem: ['mensagem_apagada', 'mensagem_editada'], trafegocall: ['voz_entrada', 'voz_saida', 'voz_mudanca'] };
+function syncPanelChannel(guildId, panelKey, channelId) { const config = configFor(guildId); if (panelKey === 'systemlogs') config.channelId = channelId || ''; for (const event of PANEL_EVENT_MAP[panelKey] || []) { if (channelId) config.channels[event] = channelId; else delete config.channels[event]; } save(); return config; }
 function status(guildId) { const config = configFor(guildId); return { ...config, channels: { ...config.channels } }; }
 async function channelFor(guild, event) {
  if (!guild) return null;
@@ -46,4 +48,4 @@ async function install(client) {
  client.on(Events.InviteDelete, invite => invite.guild && send(invite.guild, 'convite_excluido', embed('Convite excluído', `Código: ${invite.code}`, COLORS.bad)));
  client.on(Events.InteractionCreate, interaction => { if (!interaction.guild || !interaction.isButton?.()) return; if (interaction.customId === 'ticket_claim') send(interaction.guild, 'ticket_assumido', embed('Ticket assumido', `${who(interaction.user)} assumiu ${interaction.channel}.`, COLORS.info)); if (interaction.customId === 'ticket_close') send(interaction.guild, 'ticket_fechado', embed('Ticket fechado', `${who(interaction.user)} fechou ${interaction.channel}.`, COLORS.bad)); });
 }
-module.exports = { EVENTS, install, ensure, configFor, setChannel, status, send };
+module.exports = { EVENTS, install, ensure, configFor, setChannel, syncPanelChannel, status, send };

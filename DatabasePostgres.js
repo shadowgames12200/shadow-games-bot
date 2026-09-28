@@ -26,6 +26,19 @@ function writeJsonAtomic(file, data) {
   fs.renameSync(temporary, file);
 }
 
+function normalizedDatabaseUrl(value) {
+  try {
+    const url = new URL(value);
+    // Let the explicit pg `ssl` option below control certificate validation.
+    // Some providers append sslmode=verify-full, which otherwise overrides it.
+    url.searchParams.delete('sslmode');
+    url.searchParams.delete('uselibpqcompat');
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
 function scheduleRetry() {
   if (retryTimer || !pendingSync.size) return;
   retryTimer = setTimeout(async () => {
@@ -63,11 +76,11 @@ async function initialize() {
       return;
     }
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: normalizedDatabaseUrl(process.env.DATABASE_URL),
       max: 4,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
-      ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+      ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'true' },
     });
     await pool.query(`
       create table if not exists bot_documents (

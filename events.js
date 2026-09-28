@@ -1,32 +1,27 @@
-const fs = require('fs');
-const path = require('path');
-const { recordError, runLimited } = require('../Lib/Resilience');
+const fs = require('fs')
 
 module.exports = {
     run: (client) => {
-        const handlers = new Map();
-        fs.readdirSync(path.join(__dirname, '../Eventos/')).forEach(local => {
-            const dir = path.join(__dirname, '../Eventos/', local);
-            if (!fs.statSync(dir).isDirectory()) return;
-            fs.readdirSync(dir).filter(file => file.endsWith('.js')).forEach(file => {
-                const event = require(path.join(dir, file));
-                if (!event?.name || typeof event.run !== 'function') return;
-                if (!handlers.has(event.name)) handlers.set(event.name, []);
-                handlers.get(event.name).push(event);
-            });
-        });
-        for (const [name, events] of handlers) {
-            const dispatch = async (...args) => {
-                for (const event of events) {
-                    try {
-                        await runLimited(() => event.run(...args, client), `discord:${name}`, 4);
-                    } catch (error) {
-                        recordError(error, { type: 'eventHandler', event: name, handler: event.name });
-                    }
+        const interactionHandlers = []
+        fs.readdirSync('./Eventos/').forEach(local => {
+            const eventFiles = fs.readdirSync(`./Eventos/${local}`).filter(arquivo => arquivo.endsWith('.js'))
+            for (const file of eventFiles) {
+                const event = require(`../Eventos/${local}/${file}`)
+                if (event.name === 'interactionCreate') {
+                    interactionHandlers.push(event)
+                    continue
                 }
-            };
-            if (events.some(event => event.once)) client.once(name, dispatch);
-            else client.on(name, dispatch);
+                if (event.once) client.once(event.name, (...args) => event.run(...args, client))
+                else client.on(event.name, (...args) => event.run(...args, client))
+            }
+        })
+        if (interactionHandlers.length) {
+            client.on('interactionCreate', async (...args) => {
+                for (const event of interactionHandlers) {
+                    try { await event.run(...args, client) }
+                    catch (error) { console.error(`[Events] Falha em ${event.name}:`, error) }
+                }
+            })
         }
     }
-};
+}
