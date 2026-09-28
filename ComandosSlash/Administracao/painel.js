@@ -1,4 +1,4 @@
-const { EmbedBuilder, ApplicationCommandType, ActionRowBuilder, ButtonBuilder } = require("discord.js");
+const { EmbedBuilder, ApplicationCommandType, ActionRowBuilder, ButtonBuilder, PermissionFlagsBits } = require("discord.js");
 const startTime = Date.now();
 const maxMemory = 100;
 const usedMemory = process.memoryUsage().heapUsed / 1024 / 1024;
@@ -14,7 +14,9 @@ module.exports = {
   type: ApplicationCommandType.ChatInput,
 
   run: async (client, interaction, message) => {
-    if (interaction.user.id !== owner) { return interaction.reply({ ephemeral: true, content: `❌ | Você não possui permissão para usar esse comando.` })}
+    const isOwner = interaction.user.id === owner;
+    const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) || interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+    if (!isOwner && !isAdmin) { return interaction.reply({ ephemeral: true, content: `❌ | Você precisa de Administrador ou Gerenciar Servidor para usar este comando.` })}
 
     Painel(interaction, client)
   }
