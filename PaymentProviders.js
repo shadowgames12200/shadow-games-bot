@@ -14,6 +14,9 @@ const PROVIDERS = {
 let efiToken = null;
 let efiTokenExpiresAt = 0;
 let efiTokenCacheKey = '';
+let efiCobToken = null;
+let efiCobTokenExpiresAt = 0;
+let efiCobTokenCacheKey = '';
 
 function ensure() {
   let changed = false;
@@ -132,6 +135,9 @@ function efiHttpsAgent() {
 function efiBase(mode = db.payment.mode) {
   return mode === 'production' ? 'https://pix.api.efipay.com.br' : 'https://pix-h.api.efipay.com.br';
 }
+function efiCobBase(mode = db.payment.mode) {
+  return mode === 'production' ? 'https://cobrancas.api.efipay.com.br' : 'https://cobrancas-h.api.efipay.com.br';
+}
 
 function toMinorUnits(value) {
   const normalized = Number(String(value ?? '').trim().replace(',', '.'));
@@ -219,6 +225,76 @@ async function efiRequest(method, path, data, mode = db.payment.mode) {
     }
     throw efiError(error, method === 'post' ? 'criar-cobranca' : 'consultar-cobranca');
   }
+}
+
+
+async function efiCobAccessToken(mode = db.payment.mode) {
+  const id = process.env.EFI_COB_CLIENT_ID || process.env.EFI_CLIENT_ID || '';
+  const secret = process.env.EFI_COB_CLIENT_SECRET || process.env.EFI_CLIENT_SECRET || '';
+  if (!id || !secret) throw new Error('Credenciais da API Cobranças Efí não configuradas.');
+  const key = `${mode}:${id}`;
+  if (efiCobToken && efiCobTokenCacheKey === key && Date.now() < efiCobTokenExpiresAt) return efiCobToken;
+  try {
+    const response = await axios.post(`${efiCobBase(mode)}/v1/authorize`,
+      { grant_type: 'client_credentials' }, {
+        httpsAgent: efiHttpsAgent(),
+        auth: { username: id, password: secret },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        timeout: 15000
+      });
+    if (!response.data?.access_token) throw new Error('A Efí não retornou token da API Cobranças.');
+    efiCobToken = response.data.access_token;
+    efiCobTokenCacheKey = key;
+    efiCobTokenExpiresAt = Date.now() + Math.max(60, Number(response.data.expires_in || 600) - 60) * 1000;
+    return efiCobToken;
+  } catch (error) { throw efiError(error, 'autenticar-cobrancas'); }
+}
+
+async function efiCobRequest(method, path, data, mode = db.payment.mode) {
+  const token = await efiCobAccessToken(mode);
+  try {
+    const response = await axios.request({
+      method, url: `${efiCobBase(mode)}${path}`, data,
+      httpsAgent: efiHttpsAgent(),
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      timeout: 15000
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) { efiCobToken = null; efiCobTokenExpiresAt = 0; }
+    throw efiError(error, method === 'post' ? 'cobrancas' : 'consultar-cobrancas');
+  }
+}
+
+async function getEfiPaymentLink(chargeId, mode = db.payment.mode) {
+  if (!chargeId || !/^\d+$/.test(String(chargeId))) throw new Error('charge_id Efí inválido.');
+  return efiCobRequest('get', `/v1/charge/${encodeURIComponent(chargeId)}`, undefined, mode);
+}
+
+async function createEfiPaymentLink({ ref, value, description, productName, quantity }) {
+  ensure();
+  if (!configured('efi')) throw new Error('Efí não configurada.');
+  const amount = Number(String(value ?? '').replace(',', '.'));
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('Valor inválido para cartão.');
+  const mode = db.payment.mode;
+  const publicUrl = process.env.RENDER_EXTERNAL_URL || 'https://shadow-games-bot-na47.onrender.com';
+  const body = {
+    items: [{ name: String(productName || 'Pedido Shadow Games').slice(0, 100),
+      value: Math.round(amount * 100), amount: Number(quantity) || 1 }],
+    metadata: { custom_id: ref, notification_url: `${publicUrl}/webhooks/efi` },
+    settings: { payment_method: 'credit_card',
+      expire_at: new Date(Date.now() + 10 * 60 * 1000).toISOString().slice(0, 10),
+      message: String(description || `Pedido ${ref}`).slice(0, 80) }
+  };
+  const response = await efiCobRequest('post', '/v1/charge/one-step/link', body, mode);
+  const data = response?.data || {};
+  if (!data.payment_url || !data.charge_id) {
+    throw new Error('A Efí não retornou o link. Habilite API de Emissões e cartão.');
+  }
+  recordCharge(ref, { provider: 'efi', providerId: String(data.charge_id),
+    externalReference: ref, mode, method: 'credit_card', status: 'LINK',
+    paymentUrl: data.payment_url, expiresAt: Date.now() + 10 * 60 * 1000 });
+  return { id: String(data.charge_id), ref, paymentUrl: data.payment_url, mode };
 }
 
 async function createEfiPixCharge({ ref, value, description }) {
@@ -332,6 +408,6 @@ function getChargeByReference(ref) {
 module.exports = {
   db, save, PROVIDERS, ensure, configured, select, status, createOrderRef, recordCharge,
   processWebhook, findChargeByProviderId, getChargeByReference,
-  createEfiPixCharge, getEfiCharge, isEfiChargePaid, toMinorUnits, buildEfiChargePayload,
+  createEfiPixCharge, createEfiPaymentLink, getEfiPaymentLink, getEfiCharge, isEfiChargePaid, toMinorUnits, buildEfiChargePayload,
   createAsaasPixCharge, createAsaasCheckout, getAsaasPayment
 };
