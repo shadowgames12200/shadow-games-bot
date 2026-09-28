@@ -6,6 +6,8 @@ const paymentProviders = require('../PaymentProviders');
 const QRCode = require('qrcode');
 const db = new QuickDB();
 const paymentCreationInProgress = new Set();
+const REVOLUT_EUR = process.env.REVOLUT_EUR_DETAILS || 'Configure REVOLUT_EUR_DETAILS no Render.';
+const REVOLUT_USD = process.env.REVOLUT_USD_DETAILS || 'Configure REVOLUT_USD_DETAILS no Render.';
 
 
 async function DentroCarrinhoPix(interaction, client) {
@@ -106,15 +108,75 @@ async function DentroCarrinhoPix(interaction, client) {
     } catch (error) {
         console.error('[Pagamento] Falha ao criar Pix:', error.message);
         const row3 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('pagarpix').setLabel('Pix').setStyle(3),
-            new ButtonBuilder().setCustomId('pagarcrypto').setLabel('Crypto').setStyle(1).setDisabled(true),
-            new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setStyle(2)
+            new ButtonBuilder().setCustomId('pagarpix').setLabel('Pix').setEmoji(process.env.EMOJI_PIX || '💠').setStyle(3),
+            new ButtonBuilder().setCustomId('pagarcartao').setLabel('Cartão de crédito').setEmoji(process.env.EMOJI_CARD || '💳').setStyle(1),
+            new ButtonBuilder().setCustomId('pagarinternacional').setLabel('Dólar/Euro').setEmoji(process.env.EMOJI_CURRENCY || '💵').setStyle(1),
+            new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(process.env.EMOJI_BACK || '⬅️').setStyle(2)
         )
         await tt.edit({ content: 'Selecione uma forma de pagamento.', components: [row3], embeds: [] }).catch(() => {})
         await interaction.followUp({ content: '❌ | Não foi possível criar a cobrança Pix. Verifique as credenciais/certificado do provedor ou tente novamente mais tarde.', ephemeral: true }).catch(() => {})
     } finally {
         paymentCreationInProgress.delete(channelId);
     }
+}
+
+
+async function DentroCarrinhoCard(interaction) {
+    await interaction.deferUpdate();
+    const channelId = String(interaction.channel.id);
+    if (paymentCreationInProgress.has(channelId) || pagamentos.has(`${channelId}.pagamentos`)) {
+        return interaction.followUp({ content: 'Já existe um pagamento pendente neste pedido.', ephemeral: true }).catch(() => {});
+    }
+    paymentCreationInProgress.add(channelId);
+    try {
+        const yy = await carrinhos.get(channelId);
+        const campos = produtos.get(`${yy.infos.produto}.Campos`);
+        const campo = campos.find(item => item.Nome === yy.infos.campo);
+        let valor = Number(campo.valor) * Number(yy.quantidadeselecionada);
+        const ref = paymentProviders.createOrderRef(channelId);
+        const link = await paymentProviders.createEfiPaymentLink({ ref, value: valor,
+            description: `Pedido ${ref}`, productName: yy.infos.produto,
+            quantity: yy.quantidadeselecionada });
+        const embed = new EmbedBuilder()
+            .setColor(configuracao.get('Cores.Principal') || '2b2d31')
+            .setTitle('Pagamento via cartão — Efí Bank')
+            .setDescription('Clique abaixo para abrir o checkout seguro da Efí. O bot não recebe os dados do cartão.')
+            .addFields({ name: 'Detalhes', value: `\`${yy.quantidadeselecionada}x ${yy.infos.produto} - ${yy.infos.campo} | R$ ${valor.toFixed(2)}\`` })
+            .setFooter({ text: `${interaction.guild.name} - Link da Efí` }).setTimestamp();
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setLabel('Abrir pagamento Efí').setStyle(5).setURL(link.paymentUrl),
+            new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(process.env.EMOJI_BACK || '⬅️').setStyle(2)
+        );
+        carrinhos.set(`${channelId}.pagamentos`, { id: link.id, ref, method: 'credit_card', provider: 'efi', paymentUrl: link.paymentUrl });
+        pagamentos.set(`${channelId}.pagamentos`, { id: link.id, ref, method: 'credit_card', provider: 'efi', value: valor.toFixed(2), data: Date.now() });
+        await interaction.message.edit({ content: '', embeds: [embed], components: [row] });
+    } catch (error) {
+        console.error('[Pagamento] Falha ao criar link de cartão:', error.message);
+        await interaction.message.edit({ content: 'Não foi possível criar o link de cartão. Habilite a API de Emissões e cartão na Efí.', embeds: [], components: [] }).catch(() => {});
+        await interaction.followUp({ content: '❌ O cartão ainda não está habilitado na aplicação Efí ou faltam credenciais da API Cobranças.', ephemeral: true }).catch(() => {});
+    } finally { paymentCreationInProgress.delete(channelId); }
+}
+
+async function DentroCarrinhoInternational(interaction) {
+    await interaction.deferUpdate();
+    const yy = await carrinhos.get(interaction.channel.id);
+    const campos = produtos.get(`${yy.infos.produto}.Campos`);
+    const campo = campos.find(item => item.Nome === yy.infos.campo);
+    const valor = Number(campo.valor) * Number(yy.quantidadeselecionada);
+    const embed = new EmbedBuilder().setColor(configuracao.get('Cores.Principal') || '2b2d31')
+        .setTitle('Pagamento internacional — Revolut')
+        .setDescription('Pagamento manual em dólar ou euro. Escolha a moeda, faça a transferência e envie o comprovante neste canal. O produto só será liberado após a conferência da equipe.')
+        .addFields({ name: 'Valor do pedido', value: `R$ ${valor.toFixed(2)}` },
+            { name: 'EUR — Revolut', value: REVOLUT_EUR },
+            { name: 'USD — Revolut', value: REVOLUT_USD },
+            { name: 'Importante', value: 'Use os dados da mesma moeda. Não envie senha, código de segurança ou chave privada.' })
+        .setFooter({ text: `${interaction.guild.name} - Conferência manual` }).setTimestamp();
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('comprovanteinternacional').setLabel('Enviei o comprovante').setEmoji('📎').setStyle(3),
+        new ButtonBuilder().setCustomId('confirmarpagamentomanual').setLabel('Aprovar após conferir').setStyle(3),
+        new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(process.env.EMOJI_BACK || '⬅️').setStyle(2)
+    );
+    await interaction.message.edit({ content: `<@${interaction.user.id}>`, embeds: [embed], components: [row] });
 }
 
 async function DentroCarrinho2(interaction) {
@@ -132,24 +194,12 @@ async function DentroCarrinho2(interaction) {
     // content: `Selecione uma forma de pagamento.`
 
 
-    const row3 = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId("pagarpix")
-                .setLabel('<:ea12:1270352455795867741> Pix')
-                .setStyle(3),
-
-            new ButtonBuilder()
-                .setCustomId("pagarcrypto")
-                .setLabel('<:emoji_49:1270355096143790231> Crypto')
-                .setStyle(1)
-                .setDisabled(true),
-
-            new ButtonBuilder()
-                .setCustomId("voltarcarrinho")
-                .setLabel('<:emoji_48:1270355023741714492> Voltar')
-                .setStyle(2)
-        )
+    const row3 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('pagarpix').setLabel('Pix').setEmoji(process.env.EMOJI_PIX || '💠').setStyle(3),
+        new ButtonBuilder().setCustomId('pagarcartao').setLabel('Cartão de crédito').setEmoji(process.env.EMOJI_CARD || '💳').setStyle(1),
+        new ButtonBuilder().setCustomId('pagarinternacional').setLabel('Dólar/Euro').setEmoji(process.env.EMOJI_CURRENCY || '💵').setStyle(1),
+        new ButtonBuilder().setCustomId('voltarcarrinho').setLabel('Voltar').setEmoji(process.env.EMOJI_BACK || '⬅️').setStyle(2)
+    )
 
     await interaction.message.edit({ content: `Selecione uma forma de pagamento.`, components: [row3], embeds: [] })
 }
@@ -278,5 +328,7 @@ async function DentroCarrinho1(thread, status) {
 module.exports = {
     DentroCarrinho1,
     DentroCarrinho2,
-    DentroCarrinhoPix
+    DentroCarrinhoPix,
+    DentroCarrinhoCard,
+    DentroCarrinhoInternational
 }

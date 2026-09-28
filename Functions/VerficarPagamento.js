@@ -71,7 +71,7 @@ async function processPayments(client) {
             continue;
         }
 
-        if (method === 'pix' || method === 'pix_checkout') {
+        if (method === 'pix' || method === 'pix_checkout' || method === 'credit_card') {
             let res;
             const provider = payment.data.pagamentos.provider || (method === 'pix_checkout' ? 'asaas' : paymentProviders.status().provider);
             const isEfi = provider === 'efi';
@@ -80,13 +80,34 @@ async function processPayments(client) {
                 console.warn('[Pagamentos] Checkout Asaas pendente, mas o provedor Asaas não está selecionado.');
                 continue;
             }
+            if (method === 'credit_card' && !isEfi) {
+                console.warn('[Pagamentos] Link de cartão pendente, mas a Efí não está selecionada.');
+                continue;
+            }
             if (!isEfi && !isAsaas && payment.data.pagamentos.id !== `Aprovado Manualmente`) {
                 console.warn('[Pagamentos] Pagamento legado ignorado: nenhum provedor compatível está selecionado.');
                 continue;
             }
             let efiPaid = false;
             if (payment.data.pagamentos.id !== `Aprovado Manualmente`) {
-                if (isEfi) {
+                if (isEfi && method === 'credit_card') {
+                    const localCharge = paymentProviders.getChargeByReference(payment.data.pagamentos.ref);
+                    if (!localCharge || String(localCharge.providerId) !== String(payment.data.pagamentos.id)) {
+                        console.warn(`[Pagamentos/Efí] Link de cartão não correlacionado para o pedido ${payment.ID}; fila preservada.`);
+                        continue;
+                    }
+                    try {
+                        res = { data: await paymentProviders.getEfiPaymentLink(localCharge.providerId, localCharge.mode || 'sandbox') };
+                    } catch (error) {
+                        console.error(`[Pagamentos/Efí] Falha ao consultar link ${localCharge.providerId}:`, error.message);
+                        continue;
+                    }
+                    const status = String(res.data?.status || res.data?.data?.status || '').toUpperCase();
+                    efiPaid = ['PAID', 'APPROVED', 'CONCLUIDA', 'SETTLED'].includes(status);
+                    if (efiPaid) { localCharge.status = status; localCharge.paidAt ||= new Date().toISOString(); paymentProviders.save(); }
+                    else if (Date.now() > tenMinutesLater) { await threadChannel.delete().catch(() => {}); pagamentos.delete(payment.ID); carrinhos.delete(payment.ID); continue; }
+                    else continue;
+                } else if (isEfi) {
                     const localCharge = paymentProviders.getChargeByReference(payment.data.pagamentos.ref);
                     if (!localCharge || String(localCharge.providerId) !== String(payment.data.pagamentos.id)) {
                         console.warn(`[Pagamentos/Efí] Cobrança não correlacionada para o pedido ${payment.ID}; fila preservada.`);
@@ -367,5 +388,4 @@ async function VerificarPagamento(client) {
 module.exports = {
     VerificarPagamento
 }
-
 
