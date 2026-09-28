@@ -14,9 +14,9 @@ O token que veio no projeto anterior foi removido do arquivo de configuração p
 
 O token do Mercado Pago também deve ser renovado, pois a credencial anterior foi exposta. O bot prioriza `MP_ACCESS_TOKEN`; não coloque credenciais em `configuracao.json`.
 
-O pagamento agora possui seleção em tempo de execução para **Efí Bank, Banco Inter, Banco do Brasil e Asaas**. Use `/profissional pagamento` para escolher o provedor e o ambiente. O dashboard também expõe `/api/payments/providers` e `/api/payments/status`. As credenciais específicas ficam somente em variáveis de ambiente; o bot inicia em modo sandbox até que um provedor seja configurado.
+O pagamento oferece seleção de **Efí Bank ou Asaas** em `/botconfig` → **Definições** → **Formas de pagamento**. Escolha o ambiente no menu; Produção pede confirmação explícita por poder criar cobranças reais. O checkout não escolhe um provedor automaticamente: selecione e configure um antes de receber pedidos. O dashboard também expõe `/api/payments/providers` e `/api/payments/status`; credenciais da Efí devem ficar somente nos secrets do host.
 
-Variáveis esperadas: Efí (`EFI_CLIENT_ID`, `EFI_CLIENT_SECRET`, `EFI_CERT_PATH`, `EFI_KEY_PATH`, `EFI_PIX_KEY`); Inter (`INTER_CLIENT_ID`, `INTER_CLIENT_SECRET`, `INTER_CERT_PATH`, `INTER_KEY_PATH`, `INTER_PIX_KEY`); BB (`BB_CLIENT_ID`, `BB_CLIENT_SECRET`, `BB_CERT_PATH`, `BB_KEY_PATH`, `BB_PIX_KEY`); Asaas (`ASAAS_API_KEY`, `ASAAS_PIX_KEY`). A camada de seleção e recebimento idempotente de webhooks está pronta; a emissão de cobranças em produção depende de credenciais válidas, certificados quando exigidos e configuração dos endpoints oficiais do provedor escolhido.
+Variáveis Efí esperadas: `EFI_CLIENT_ID`, `EFI_CLIENT_SECRET`, `EFI_PIX_KEY` e um certificado mTLS (recomendado `EFI_CERT_P12_BASE64`, opcionalmente `EFI_CERT_P12_PASSWORD`; também são aceitos certificados/caminhos PEM indicados em `.env.example`). Asaas usa `ASAAS_API_KEY`. A emissão em produção depende de credenciais e certificados válidos do ambiente selecionado.
 
 ## Configuração
 

@@ -95,7 +95,12 @@ module.exports = {
     if (sub === 'painel-equipe') { const key = interaction.options.getString('equipe').toLowerCase(); if (!db.teams[key]) return interaction.reply({ content: '❌ Equipe não encontrada.', ephemeral: true }); const channel = interaction.options.getChannel('canal'); const cfg = db.teams[key]; const form = db.forms[key] || { title: `Atendimento ${cfg.name}` }; await channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle(form.title).setDescription(`Abra um atendimento diretamente com a equipe **${cfg.name}**.`)], components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`advanced_ticket_open:${key}`).setLabel(`Abrir com ${cfg.name}`).setEmoji('🎫').setStyle(ButtonStyle.Primary))] }); return interaction.reply({ content: `✅ Painel da equipe publicado em ${channel}.`, ephemeral: true }); }
     if (sub === 'pagamento') {
       try {
-        const result = payments.select(interaction.options.getString('provedor'), interaction.options.getString('modo'));
+        const provider = interaction.options.getString('provedor');
+        const mode = interaction.options.getString('modo');
+        if (mode === 'production') {
+          return interaction.reply({ content: '⚠️ Para ativar Produção com confirmação, use `/botconfig` → **Definições** → **Formas de pagamento**.', ephemeral: true });
+        }
+        const result = payments.select(provider, mode);
         return interaction.reply({ content: `✅ Provedor selecionado: **${result.name}** (${result.mode}).\nConfiguração encontrada: **${result.configured ? 'sim' : 'ainda não'}**.`, ephemeral: true });
       } catch (error) {
         return interaction.reply({ content: `❌ ${error.message}`, ephemeral: true });

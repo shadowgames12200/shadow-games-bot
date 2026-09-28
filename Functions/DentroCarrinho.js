@@ -35,11 +35,9 @@ async function DentroCarrinhoPix(interaction, client) {
         const valorNumerico = Number(String(valor).replace(',', '.'))
         if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) throw new Error(`Valor inválido para pagamento: ${valor}`)
 
-        let providerStatus = paymentProviders.status();
-        if (!providerStatus.provider && paymentProviders.configured('efi')) {
-            providerStatus = paymentProviders.select('efi', process.env.EFI_MODE || 'sandbox');
-        } else if (!providerStatus.provider && paymentProviders.configured('asaas')) {
-            providerStatus = paymentProviders.select('asaas', process.env.ASAAS_MODE || 'sandbox');
+        const providerStatus = paymentProviders.status();
+        if (!providerStatus.provider) {
+            throw new Error('Selecione o provedor e o ambiente em /botconfig → Definições → Formas de pagamento antes de receber pedidos.');
         }
         if (!providerStatus.provider || !providerStatus.configured) {
             throw new Error('Configure o provedor de pagamento escolhido e suas credenciais no ambiente do bot.');
