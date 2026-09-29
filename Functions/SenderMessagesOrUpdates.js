@@ -45,7 +45,7 @@ async function MessageCreate(interaction, client) {
         const embed = new EmbedBuilder()
 
             .setColor(`${fdfd.colorembed}`)
-            .setDescription(productDescription(yyy.Config, interaction.guild))
+            .setDescription(await productDescription(yyy.Config, interaction.guild))
             .setFooter(
                 { text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }
             )
@@ -138,7 +138,7 @@ async function MessageCreate(interaction, client) {
         const embed = new EmbedBuilder()
 
             .setColor(`${fdfd.colorembed}`)
-            .setDescription(productDescription(yyy.Config, interaction.guild))
+            .setDescription(await productDescription(yyy.Config, interaction.guild))
 
             .setFooter(
                 { text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }
@@ -163,7 +163,7 @@ async function MessageCreate(interaction, client) {
 
 
         if (yyy.Campos[0].desc !== '') {
-            embed.addFields({ name: `${yyy.Campos[0].Nome}`, value: renderAutoEmojiAliases(yyy.Campos[0].desc.slice(0, 1024), interaction.guild), inline: true });
+            embed.addFields({ name: `${yyy.Campos[0].Nome}`, value: await renderAutoEmojiAliases(yyy.Campos[0].desc.slice(0, 1024), interaction.guild), inline: true });
         }
 
         embed.addFields(
@@ -236,7 +236,7 @@ async function UpdateMessageProduto(client, produto) {
 
     const embed = new EmbedBuilder()
 
-        .setDescription(productDescription(ghgh.Config))
+        .setDescription(await productDescription(ghgh.Config))
 
         .setTimestamp()
 
@@ -292,7 +292,7 @@ async function UpdateMessageProduto(client, produto) {
                 const fetchedMessage = await channel.messages.fetch(element.mesageid);
                 const guilddd = await client.guilds.fetch(element.guildid)
 
-                embed.setDescription(productDescription(ghgh.Config, guilddd))
+                embed.setDescription(await productDescription(ghgh.Config, guilddd))
                 embed.setColor(fetchedMessage.embeds[0].data.color)
                 embed.setFooter(
                     { text: guilddd.name }
@@ -326,7 +326,7 @@ async function UpdateMessageProduto(client, produto) {
         }
         const embed22 = new EmbedBuilder()
 
-            .setDescription(productDescription(ghgh.Config))
+            .setDescription(await productDescription(ghgh.Config))
             .setTimestamp()
 
 
@@ -371,7 +371,7 @@ async function UpdateMessageProduto(client, produto) {
                 const fetchedMessage = await channel.messages.fetch(element.mesageid);
                 const guilddd = await client.guilds.fetch(element.guildid)
 
-                embed22.setDescription(productDescription(ghgh.Config, guilddd))
+                embed22.setDescription(await productDescription(ghgh.Config, guilddd))
                 embed22.setColor(fetchedMessage.embeds[0].data.color)
                 embed22.setFooter(
                     { text: guilddd.name }
