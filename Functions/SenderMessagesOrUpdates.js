@@ -12,7 +12,7 @@ function productDescription(config, guild) {
     const text = description == null || description === ''
         ? 'Faça sua compra automática abaixo!'
         : String(description);
-    return renderAutoEmojiAliases(text, guild);
+    return renderAutoEmojiAliases(text, guild, configuracao.get('Emojis_EntregAuto'));
 }
 
 const Entrega2 = configuracao.get(`Emojis_EntregAuto`)
