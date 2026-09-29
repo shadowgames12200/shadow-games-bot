@@ -9,7 +9,7 @@ const {
   EmbedBuilder,
   PermissionFlagsBits
 } = require('discord.js');
-const { configuracao, estatisticas, tickets } = require('./DataBaseJson');
+const { configuracao, estatisticas, tickets, avaliacoes } = require('./DataBaseJson');
 const { owner: configuredOwnerId } = require('./config.json');
 const { createTicketFromModal, CreateTicket, openForm } = require('./Functions/CreateTicket');
 const { collectMessages, renderTranscript } = require('./Functions/TicketTranscript');
@@ -286,6 +286,91 @@ async function handleRating(interaction) {
   return interaction.reply({ content: `✅ Obrigado pela avaliação: **${['', 'Péssimo', 'Ruim', 'Médio', 'Bom', 'Excelente'][rating]}**.`, ephemeral: true });
 }
 
+const pendingPurchaseRatings = new Set();
+
+function parsePurchaseRating(customId) {
+  const id = String(customId || '');
+  const current = id.match(/^avaliar_([1-5])_v2_(\d{17,20})_(\d{17,20})_(.+)$/);
+  if (current) return { rating: Number(current[1]), userId: current[2], guildId: current[3], orderId: current[4] };
+
+  // Keep buttons already present in customers' DMs working after deployment.
+  const legacy = id.match(/^avaliar_([1-5])_(.+)$/);
+  return legacy ? { rating: Number(legacy[1]), userId: '', guildId: '', orderId: legacy[2] } : null;
+}
+
+function purchaseRatingKey(orderId) {
+  return `purchase_${Buffer.from(String(orderId), 'utf8').toString('base64url')}`;
+}
+
+async function handlePurchaseRating(interaction) {
+  if (!interaction.isButton?.()) return false;
+  const parsed = parsePurchaseRating(interaction.customId);
+  if (!parsed) return false;
+
+  if (interaction.guildId || interaction.guild) {
+    await interaction.reply({ content: 'Abra a DM enviada pelo bot para avaliar este pedido.', ephemeral: true });
+    return true;
+  }
+  if (parsed.userId && parsed.userId !== String(interaction.user?.id || '')) {
+    await interaction.reply({ content: 'Esta avaliação foi enviada para outra conta e não pode ser usada aqui.' });
+    return true;
+  }
+
+  const key = purchaseRatingKey(parsed.orderId);
+  const alreadyRated = avaliacoes.get(key);
+  if (alreadyRated || pendingPurchaseRatings.has(key)) {
+    await interaction.deferUpdate();
+    await interaction.editReply({
+      content: alreadyRated ? '✅ A avaliação deste pedido já foi registrada. Obrigado!' : '⏳ Sua avaliação já está sendo registrada. Obrigado!',
+      components: []
+    });
+    return true;
+  }
+
+  pendingPurchaseRatings.add(key);
+  try {
+    await interaction.deferUpdate();
+    const record = {
+      orderId: parsed.orderId,
+      userId: String(interaction.user.id),
+      guildId: parsed.guildId,
+      rating: parsed.rating,
+      createdAt: new Date().toISOString(),
+      source: 'purchase_dm'
+    };
+    avaliacoes.set(key, record);
+    await interaction.editReply({
+      content: `✅ Obrigado! Sua avaliação de **${parsed.rating}/5** foi registrada.`,
+      components: []
+    });
+
+    const feedbackChannelId = String(configuracao.get('ConfigChannels.feedback') || '').trim();
+    if (feedbackChannelId && parsed.guildId) {
+      try {
+        const channel = await interaction.client.channels.fetch(feedbackChannelId).catch(() => null);
+        if (channel?.guild?.id === parsed.guildId && typeof channel.send === 'function') {
+          const stars = '⭐'.repeat(parsed.rating);
+          const embed = new EmbedBuilder()
+            .setColor(parsed.rating >= 4 ? '#2ecc71' : parsed.rating === 3 ? '#f1c40f' : '#e74c3c')
+            .setTitle('Nova avaliação de compra')
+            .addFields(
+              { name: 'Cliente', value: `<@${record.userId}>`, inline: true },
+              { name: 'Pedido', value: `#${parsed.orderId}`.slice(0, 1024), inline: true },
+              { name: 'Nota', value: `${stars} (${parsed.rating}/5)`, inline: true }
+            )
+            .setTimestamp(new Date(record.createdAt));
+          await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
+        }
+      } catch (error) {
+        console.error('[PurchaseFeedback] Não foi possível enviar o log da avaliação:', error.message);
+      }
+    }
+  } finally {
+    pendingPurchaseRatings.delete(key);
+  }
+  return true;
+}
+
 async function buildTranscript(thread) {
   const { messages, incomplete, fetchError } = await collectMessages(thread);
   const html = renderTranscript({
@@ -351,6 +436,7 @@ async function handle(interaction) {
   if (interaction.isButton?.() && String(interaction.customId || '').startsWith('AbrirTicket_')) return await interaction.showModal(openForm(String(interaction.customId).replace('AbrirTicket_', '')));
   if ((interaction.isStringSelectMenu?.() || interaction.isSelectMenu?.()) && (interaction.customId === 'ticket_public_options' || interaction.customId === 'abrirticket')) return await interaction.showModal(openForm(interaction.values[0]));
   if (interaction.isModalSubmit?.() && interaction.customId?.startsWith('ticket_open_form_')) return await createTicketFromModal(interaction);
+  if (interaction.isButton?.() && String(interaction.customId || '').startsWith('avaliar_')) return handlePurchaseRating(interaction);
   if (interaction.isButton?.() && interaction.customId?.startsWith('ticket_rating_')) return handleRating(interaction);
   if (interaction.isButton?.() || interaction.isStringSelectMenu?.() || interaction.isModalSubmit?.()) {
     if (await handleClientInteraction(interaction)) return true;
@@ -470,4 +556,4 @@ async function handle(interaction) {
 }
 
 function install(client) { client.on('interactionCreate', interaction => handle(interaction).catch(error => console.error('[LegacyTicketStaff]', error))); }
-module.exports = { install, staffPanel, publicPanel, handle, isLegacyThread, config, buildTranscript, sendTranscript };
+module.exports = { install, staffPanel, publicPanel, handle, handlePurchaseRating, isLegacyThread, config, buildTranscript, sendTranscript };
