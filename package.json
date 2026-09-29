@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node tests/ticket-owner.js && node tests/botconfig-panels.js && node tests/ticket-logs-transcripts.js && node tests/log-routing.js && node tests/payment-options.js && node tests/efi-payments.js && node tests/efi-payment-panel.js && node tests/smoke-critical.js && node tests/startup-order.js && node tests/start-intents.js"
+    "test": "node tests/ticket-owner.js && node tests/botconfig-panels.js && node tests/ticket-functions.js && node tests/ticket-logs-transcripts.js && node tests/log-routing.js && node tests/payment-options.js && node tests/efi-payments.js && node tests/efi-payment-panel.js && node tests/smoke-critical.js && node tests/startup-order.js && node tests/start-intents.js"
   },
   "dependencies": {
     "@discordjs/voice": "^0.16.0",
