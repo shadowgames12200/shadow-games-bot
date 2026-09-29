@@ -13,6 +13,7 @@ const { painelTicket } = require("../../Functions/PainelTickets.js");
 const { CreateMessageTicket, Checkarmensagensticket } = require("../../Functions/CreateMensagemTicket.js");
 const { CreateTicket } = require("../../Functions/CreateTicket.js");
 const TicketLogs = require("../../LogSuite.js");
+const { addTicketFunction, getTicketPanelBlocker, listTicketFunctions, removeTicketFunction, MAX_TICKET_FUNCTIONS } = require("../../Functions/TicketFunctions.js");
 const { GerenciarCampos2 } = require("../../Functions/GerenciarCampos.js");
 const { MessageStock } = require("../../Functions/ConfigEstoque.js");
 
@@ -24,61 +25,56 @@ module.exports = {
         if (interaction.type == Discord.InteractionType.ModalSubmit) {
 
             if (interaction.customId == 'sdaju11111231idsj1233js123dua123') {
-                let NOME = interaction.fields.getTextInputValue('tokenMP');
-                let PREDESC = interaction.fields.getTextInputValue('tokenMP2');
-                let DESC = interaction.fields.getTextInputValue('tokenMP3');
-                let BANNER = interaction.fields.getTextInputValue('tokenMP5');
-                let EMOJI = interaction.fields.getTextInputValue('tokenMP6');
+                const NOME = interaction.fields.getTextInputValue('tokenMP').trim();
+                const PREDESC = interaction.fields.getTextInputValue('tokenMP2').trim();
+                const DESC = interaction.fields.getTextInputValue('tokenMP3').trim();
+                const BANNER = interaction.fields.getTextInputValue('tokenMP5').trim();
+                const EMOJI = interaction.fields.getTextInputValue('tokenMP6').trim();
 
-                NOME = NOME.replace('.', '');
-                PREDESC = PREDESC.replace('.', '');
-
-                if (tickets.get(`tickets.funcoes.${NOME}`) !== null) {
-                    return interaction.reply({ content: `❌ | Já existe uma função com esse nome!`, ephemeral: true });
+                if (!NOME) {
+                    return interaction.reply({ content: `❌ | Informe um nome para a função.`, ephemeral: true });
                 }
-
+                if (!PREDESC) {
+                    return interaction.reply({ content: `❌ | Informe uma pré descrição para a função.`, ephemeral: true });
+                }
                 if (NOME.length > 32) {
                     return interaction.reply({ content: `❌ | O nome não pode ter mais de 32 caracteres!`, ephemeral: true });
-                } else {
-                    tickets.set(`tickets.funcoes.${NOME}.nome`, NOME)
                 }
-
                 if (PREDESC.length > 64) {
                     return interaction.reply({ content: `❌ | A pré descrição não pode ter mais de 64 caracteres!`, ephemeral: true });
-                } else {
-                    tickets.set(`tickets.funcoes.${NOME}.predescricao`, PREDESC)
+                }
+                if (DESC.length > 1024) {
+                    return interaction.reply({ content: `❌ | A descrição não pode ter mais de 1024 caracteres!`, ephemeral: true });
                 }
 
-                if (DESC !== '') {
-                    if (DESC.length > 1024) {
-                        return interaction.reply({ content: `❌ | A descrição não pode ter mais de 1024 caracteres!`, ephemeral: true });
-                    } else {
-                        tickets.set(`tickets.funcoes.${NOME}.descricao`, DESC)
-                    }
+                if (BANNER !== '' && !/^(ftp|http|https):\/\/[^ "\s]+$/i.test(BANNER)) {
+                    return interaction.reply({ content: `❌ | Você escolheu incorretamente a URL do banner!`, ephemeral: true });
+                }
+                const emojiRegex = /^<:.+:\d+>$|^<a:.+:\d+>$|^\p{Emoji}$/u;
+                if (EMOJI !== '' && !emojiRegex.test(EMOJI)) {
+                    return interaction.reply({ content: `❌ | Você escolheu incorretamente o emoji!`, ephemeral: true });
                 }
 
-                if (BANNER !== '') {
-                    const urlRegex = /^(ftp|http|https):\/\/[^ "]+$/;
-                    if (!urlRegex.test(BANNER)) {
-                        tickets.set(`tickets.funcoes.${NOME}.banner`, BANNER)
-                        return interaction.reply({ message: dd, content: `❌ | Você escolheu incorretamente a URL do banner!`, ephemeral: true });
-                    } else {
-                        tickets.set(`tickets.funcoes.${NOME}.banner`, BANNER)
-                    }
-                }
+                const details = { nome: NOME, predescricao: PREDESC };
+                if (DESC !== '') details.descricao = DESC;
+                if (BANNER !== '') details.banner = BANNER;
+                if (EMOJI !== '') details.emoji = EMOJI;
 
-                if (EMOJI !== '') {
-                    const emojiRegex = /^<:.+:\d+>$|^<a:.+:\d+>$|^\p{Emoji}$/u;
-                    if (!emojiRegex.test(EMOJI)) {
-                        return interaction.reply({ content: `❌ | Você escolheu incorretamente o emoji!`, ephemeral: true });
-                    } else {
-                        tickets.set(`tickets.funcoes.${NOME}.emoji`, EMOJI)
-                    }
+                const result = addTicketFunction(tickets, NOME, details, MAX_TICKET_FUNCTIONS);
+                if (result.reason === 'invalid_name') {
+                    return interaction.reply({ content: `❌ | Informe um nome para a função.`, ephemeral: true });
                 }
+                if (result.reason === 'duplicate') {
+                    return interaction.reply({ content: `❌ | Já existe uma função com esse nome!`, ephemeral: true });
+                }
+                if (result.reason === 'limit_reached') {
+                    return interaction.reply({ content: `❌ | Você não pode criar mais de ${MAX_TICKET_FUNCTIONS} funções em seu ticket.`, ephemeral: true });
+                }
+                if (!result.ok) return interaction.reply({ content: `❌ | Não foi possível salvar a função. Tente novamente.`, ephemeral: true });
 
                 await painelTicket(interaction)
 
-                interaction.followUp({ content: `✅ | Função adicionada com sucesso!`, ephemeral: true });
+                return interaction.followUp({ content: `✅ | Função adicionada com sucesso!`, ephemeral: true });
 
 
 
@@ -322,11 +318,14 @@ module.exports = {
             }
 
             if (interaction.customId == 'deletarticketsfunction') {
-                const valordelete = interaction.values
-                for (const iterator of valordelete) {
-                    tickets.delete(`tickets.funcoes.${iterator}`)
-                }
-                return await painelTicket(interaction);
+                const removedCount = (interaction.values || []).filter(value => removeTicketFunction(tickets, value)).length;
+                await painelTicket(interaction);
+                return interaction.followUp({
+                    content: removedCount > 0
+                        ? `✅ | ${removedCount} função(ões) removida(s) com sucesso.`
+                        : `❌ | Não encontrei as funções selecionadas para remover.`,
+                    ephemeral: true,
+                });
             }
 
 
@@ -407,49 +406,38 @@ module.exports = {
 
 
             if (interaction.customId == `postarticket`) {
-                const ggg = tickets.get(`tickets.funcoes`)
-                const ggg2 = tickets.get(`tickets.aparencia`)
-
-
-                if (ggg == null || Object.keys(ggg).length == 0 || ggg2 == null || Object.keys(ggg2).length == 0) {
+                const blocker = getTicketPanelBlocker(tickets);
+                if (blocker === 'functions') {
                     return interaction.reply({ content: `❌ Adicione uma função antes de postar a mensagem.`, ephemeral: true });
-                } else {
-                    const selectaaa = new Discord.ChannelSelectMenuBuilder()
-                        .setCustomId('canalpostarticket')
-                        .setPlaceholder('Clique aqui para selecionar')
-                        .setChannelTypes(Discord.ChannelType.GuildText)
-
-                    const row1 = new ActionRowBuilder()
-                        .addComponents(selectaaa);
-
-                    interaction.reply({ components: [row1], content: `Selecione o canal onde quer postar a mensagem.`, ephemeral: true, })
-
                 }
+                if (blocker === 'appearance') {
+                    return interaction.reply({ content: `❌ Defina a aparência do painel antes de postar a mensagem.`, ephemeral: true });
+                }
+
+                const selectaaa = new Discord.ChannelSelectMenuBuilder()
+                    .setCustomId('canalpostarticket')
+                    .setPlaceholder('Clique aqui para selecionar')
+                    .setChannelTypes(Discord.ChannelType.GuildText)
+
+                const row1 = new ActionRowBuilder().addComponents(selectaaa);
+                return interaction.reply({ components: [row1], content: `Selecione o canal onde quer postar a mensagem.`, ephemeral: true });
             }
 
 
 
             if (interaction.customId == 'remfuncaoticket') {
-
-
-                const ggg = tickets.get(`tickets.funcoes`)
-
-
-
-                if (ggg == null || Object.keys(ggg).length == 0) {
+                const entries = listTicketFunctions(tickets);
+                if (entries.length === 0) {
                     return interaction.reply({ content: `❌ Não existe nenhuma função criada para remover.`, ephemeral: true });
                 }
 
-                 else {
-
+                else {
                     const selectMenuBuilder = new Discord.StringSelectMenuBuilder()
                         .setCustomId('deletarticketsfunction')
                         .setPlaceholder('Clique aqui para selecionar')
-                        .setMinValues(0)
+                        .setMinValues(1)
 
-                    for (const chave in ggg) {
-                        const item = ggg[chave];
-
+                    for (const [chave, item] of entries) {
                         const option = {
                             label: `${item.nome}`,
                             description: `${item.predescricao}`,
@@ -461,7 +449,7 @@ module.exports = {
 
                     }
 
-                    selectMenuBuilder.setMaxValues(Object.keys(ggg).length)
+                    selectMenuBuilder.setMaxValues(entries.length)
 
                     const style2row = new ActionRowBuilder().addComponents(selectMenuBuilder);
                     try {
@@ -704,11 +692,8 @@ module.exports = {
 
             if (interaction.customId.startsWith('addfuncaoticket')) {
 
-                const dd = tickets.get('tickets.funcoes')
-
-
-                if (dd && Object.keys(dd).length > 24) {
-                    return interaction.reply({ content: `❌ | Você não pode criar mais de 24 funções em seu TICKET!` });
+                if (listTicketFunctions(tickets).length >= MAX_TICKET_FUNCTIONS) {
+                    return interaction.reply({ content: `❌ | Você não pode criar mais de ${MAX_TICKET_FUNCTIONS} funções em seu ticket!`, ephemeral: true });
                 }
 
                 const modalaAA = new ModalBuilder()

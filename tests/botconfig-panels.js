@@ -52,6 +52,9 @@ async function main() {
   assert.match(dispatcher, /ticket_transcript_channel_select/);
   assert.match(dispatcher, /TicketLogs\.setChannel\(interaction\.guild\.id, 'ticket_aberto', channelId\)/);
   assert.match(dispatcher, /TicketLogs\.setChannel\(interaction\.guild\.id, 'ticket_fechado', channelId\)/);
+  assert.match(dispatcher, /addTicketFunction\(tickets, NOME, details, MAX_TICKET_FUNCTIONS\)/);
+  assert.match(dispatcher, /removeTicketFunction\(tickets, value\)/);
+  assert.match(dispatcher, /getTicketPanelBlocker\(tickets\)/);
 
   console.log('botconfig-panels=ok');
 }
