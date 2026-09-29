@@ -87,7 +87,7 @@ async function Painel(interaction, client) {
 
 async function Gerenciar2(interaction, client) {
 
-  const ggg = produtos.valueArray();
+  const ggg = produtos.fetchAll();
 
 
   const embed = new EmbedBuilder()

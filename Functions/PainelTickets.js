@@ -9,22 +9,31 @@ async function painelTicket(interaction) {
         .setTimestamp()
 
 
-    if (tickets.get(`tickets.aparencia.title`) !== null) {
-        embed.setTitle(tickets.get(`tickets.aparencia.title`))
+    const title = tickets.get(`tickets.aparencia.title`);
+    if (typeof title === 'string' && title.trim().length > 0 && title.length <= 256) {
+        embed.setTitle(title);
     }
-    if (tickets.get(`tickets.aparencia.description`) !== null) {
-        embed.setDescription(tickets.get(`tickets.aparencia.description`))
+
+    const description = tickets.get(`tickets.aparencia.description`);
+    if (typeof description === 'string' && description.trim().length > 0 && description.length <= 4096) {
+        embed.setDescription(description);
     }
-    if (tickets.get(`tickets.aparencia.color`) !== null) {
-        embed.setColor(tickets.get(`tickets.aparencia.color`))
+
+    const color = tickets.get(`tickets.aparencia.color`);
+    if (typeof color === 'number' && Number.isInteger(color) && color >= 0 && color <= 0xffffff) {
+        embed.setColor(color);
+    } else if (typeof color === 'string' && /^#?(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color.trim())) {
+        embed.setColor(color.trim());
     }
-    if (tickets.get(`tickets.aparencia.banner`) !== null) {
-        embed.setImage(tickets.get(`tickets.aparencia.banner`))
+
+    const banner = tickets.get(`tickets.aparencia.banner`);
+    if (typeof banner === 'string' && /^https?:\/\/\S+$/i.test(banner.trim())) {
+        embed.setImage(banner.trim());
     }
 
     const funcoes = tickets.get(`tickets.funcoes`);
 
-    if(funcoes !== null){
+    if (funcoes && typeof funcoes === 'object') {
 
     let count = 0;
     let maxItems = 4;

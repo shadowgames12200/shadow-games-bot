@@ -325,7 +325,7 @@ module.exports = {
                 for (const iterator of valordelete) {
                     tickets.delete(`tickets.funcoes.${iterator}`)
                 }
-                painelTicket(interaction)
+                return await painelTicket(interaction);
             }
 
 
@@ -808,7 +808,7 @@ module.exports = {
             if (interaction.customId.startsWith('painelconfigticket')) {
 
 
-                painelTicket(interaction)
+                return await painelTicket(interaction);
 
 
             }
@@ -978,7 +978,7 @@ module.exports = {
 
             if (interaction.customId.startsWith('voltar3')) {
 
-                Gerenciar2(interaction, client)
+                return await Gerenciar2(interaction, client);
 
             }
 
@@ -992,7 +992,7 @@ module.exports = {
             if (interaction.customId.startsWith('painelconfigvendas')) {
 
 
-                Gerenciar2(interaction, client)
+                return await Gerenciar2(interaction, client);
 
 
 
