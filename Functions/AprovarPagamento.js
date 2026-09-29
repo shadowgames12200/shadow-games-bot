@@ -323,16 +323,22 @@ async function EntregarPagamentos(client) {
 
                 try {
                     setTimeout(async () => {
-                        const dd = configuracao.get(`ConfigChannels.feedback`)
-                        if (dd !== null) {
+                        try {
+                            const feedbackChannelId = configuracao.get('ConfigChannels.feedback');
+                            if (!feedbackChannelId) return;
                             const row6aa = new ActionRowBuilder()
                                 .addComponents(
                                     ...[1, 2, 3, 4, 5].map(n => new ButtonBuilder()
-                                        .setCustomId(`avaliar_${n}_${entrega.data.id}`)
-                                        .setLabel(`${n}⭐`)
+                                        .setCustomId(`avaliar_${n}_v2_${member.id}_${yy.guild.id}_${entrega.data.id}`)
+                                        .setLabel(`${n} ⭐`)
                                         .setStyle(n >= 4 ? 3 : n >= 3 ? 2 : 4))
-                                )
-                            await member.send({ components: [row6aa], content: `Eai, <@!${member.id}>, deu tudo certo? Avalie sua experiência com a Shadow Games:` })
+                                );
+                            await member.send({
+                                components: [row6aa],
+                                content: `Olá, <@${member.id}>! Seu pedido **#${entrega.data.id}** foi entregue. Deu tudo certo? Escolha uma nota para avaliar sua experiência com a Shadow Games:`
+                            });
+                        } catch (error) {
+                            console.error('[PurchaseFeedback] Não foi possível enviar a avaliação por DM:', error.message);
                         }
                     }, 60000);
                 } catch (error) {
