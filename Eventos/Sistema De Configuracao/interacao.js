@@ -541,6 +541,14 @@ module.exports = {
                 }
 
                 GerenciarProduto(interaction, 1, ggg.name);
+                const publishedMessages = produtos.get(`${ggg.name}.mensagens`);
+                if (Array.isArray(publishedMessages) && publishedMessages.length > 0) {
+                    try {
+                        await UpdateMessageProduto(client, ggg.name);
+                    } catch (error) {
+                        console.error(`[Produto] Não foi possível atualizar os painéis publicados de "${ggg.name}":`, error);
+                    }
+                }
             }
 
 
