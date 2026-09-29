@@ -5,7 +5,15 @@ const db = new QuickDB();
 
 const Discord = require("discord.js")
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js")
+const { renderAutoEmojiAliases } = require('./RenderEmojiAliases');
 
+function productDescription(config, guild) {
+    const description = config?.desc;
+    const text = description == null || description === ''
+        ? 'Faça sua compra automática abaixo!'
+        : String(description);
+    return renderAutoEmojiAliases(text, guild);
+}
 
 const Entrega2 = configuracao.get(`Emojis_EntregAuto`)
 
@@ -37,7 +45,7 @@ async function MessageCreate(interaction, client) {
         const embed = new EmbedBuilder()
 
             .setColor(`${fdfd.colorembed}`)
-            .setDescription(`${yyy.Config.desc == '' ? `Faça sua compra automática abaixo!` : yyy.Config.desc}`)
+            .setDescription(productDescription(yyy.Config, interaction.guild))
             .setFooter(
                 { text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }
             )
@@ -130,7 +138,7 @@ async function MessageCreate(interaction, client) {
         const embed = new EmbedBuilder()
 
             .setColor(`${fdfd.colorembed}`)
-            .setDescription(`${yyy.Config.desc === undefined || yyy.Config.desc === '' ? `Faça sua compra automática abaixo!` : yyy.Config.desc}`)
+            .setDescription(productDescription(yyy.Config, interaction.guild))
 
             .setFooter(
                 { text: interaction.guild.name, iconURL: interaction.guild.iconURL({ dynamic: true }) }
@@ -155,7 +163,7 @@ async function MessageCreate(interaction, client) {
 
 
         if (yyy.Campos[0].desc !== '') {
-            embed.addFields({ name: `${yyy.Campos[0].Nome}`, value: `${yyy.Campos[0].desc.slice(0, 1024)}`, inline: true });
+            embed.addFields({ name: `${yyy.Campos[0].Nome}`, value: renderAutoEmojiAliases(yyy.Campos[0].desc.slice(0, 1024), interaction.guild), inline: true });
         }
 
         embed.addFields(
@@ -228,7 +236,7 @@ async function UpdateMessageProduto(client, produto) {
 
     const embed = new EmbedBuilder()
 
-        .setDescription(`${ghgh.Config.desc == '' ? `Faça sua compra automática abaixo!` : ghgh.Config.desc}`)
+        .setDescription(productDescription(ghgh.Config))
 
         .setTimestamp()
 
@@ -284,6 +292,7 @@ async function UpdateMessageProduto(client, produto) {
                 const fetchedMessage = await channel.messages.fetch(element.mesageid);
                 const guilddd = await client.guilds.fetch(element.guildid)
 
+                embed.setDescription(productDescription(ghgh.Config, guilddd))
                 embed.setColor(fetchedMessage.embeds[0].data.color)
                 embed.setFooter(
                     { text: guilddd.name }
@@ -317,7 +326,7 @@ async function UpdateMessageProduto(client, produto) {
         }
         const embed22 = new EmbedBuilder()
 
-            .setDescription(`${ghgh.Config.desc == '' ? `Faça sua compra automática abaixo!` : ghgh.Config.desc}`)
+            .setDescription(productDescription(ghgh.Config))
             .setTimestamp()
 
 
@@ -362,6 +371,7 @@ async function UpdateMessageProduto(client, produto) {
                 const fetchedMessage = await channel.messages.fetch(element.mesageid);
                 const guilddd = await client.guilds.fetch(element.guildid)
 
+                embed22.setDescription(productDescription(ghgh.Config, guilddd))
                 embed22.setColor(fetchedMessage.embeds[0].data.color)
                 embed22.setFooter(
                     { text: guilddd.name }
