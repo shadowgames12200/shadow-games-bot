@@ -38,7 +38,9 @@ async function main() {
   assert.equal(ticketInteraction.updates.length, 1, 'o painel de tickets deve atualizar a interação');
   assert.equal(ticketInteraction.updates[0].embeds[0].data.title, undefined);
   assert.equal(ticketInteraction.updates[0].embeds[0].data.description, undefined);
-  assert.equal(ticketInteraction.updates[0].components.length, 3);
+  assert.equal(ticketInteraction.updates[0].components.length, 5);
+  assert.equal(ticketInteraction.updates[0].components[2].components[0].data.custom_id, 'ticket_log_channel_select');
+  assert.equal(ticketInteraction.updates[0].components[3].components[0].data.custom_id, 'ticket_transcript_channel_select');
 
   const dispatcher = fs.readFileSync(
     path.join(__dirname, '../Eventos/Sistema De Configuracao/painel.js'),
@@ -46,6 +48,10 @@ async function main() {
   );
   assert.match(dispatcher, /return await painelTicket\(interaction\)/);
   assert.match(dispatcher, /return await Gerenciar2\(interaction, client\)/);
+  assert.match(dispatcher, /ticket_log_channel_select/);
+  assert.match(dispatcher, /ticket_transcript_channel_select/);
+  assert.match(dispatcher, /TicketLogs\.setChannel\(interaction\.guild\.id, 'ticket_aberto', channelId\)/);
+  assert.match(dispatcher, /TicketLogs\.setChannel\(interaction\.guild\.id, 'ticket_fechado', channelId\)/);
 
   console.log('botconfig-panels=ok');
 }

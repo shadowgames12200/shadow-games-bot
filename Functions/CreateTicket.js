@@ -4,6 +4,7 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 const { configuracao, tickets, estatisticas } = require('../DataBaseJson');
+const TicketLogs = require('../LogSuite');
 
 const aberturaCooldown = new Map();
 const FORM_PREFIX = 'ticket_open_form_';
@@ -15,6 +16,49 @@ function isSupportType(value) {
 }
 function formKind(value) { return isSupportType(value) ? 'support' : 'doubt'; }
 function formCustomId(value) { return `${FORM_PREFIX}${formKind(value)}`; }
+
+function recordTicketOpening(thread, interaction, category) {
+  const key = `tickets.staffState.${thread.id}`;
+  const current = tickets.get(key) || {};
+  tickets.set(key, {
+    status: 'aberto', priority: 'normal', claimedBy: '', linkedPurchase: '', transfer: '',
+    ...current,
+    status: 'aberto',
+    ownerId: String(interaction.user.id),
+    ownerTag: interaction.user.tag || interaction.user.username || String(interaction.user.id),
+    category: String(category || 'Atendimento').slice(0, 100),
+    openedAt: current.openedAt || thread.createdTimestamp || Date.now()
+  });
+}
+
+async function sendTicketOpenLog(interaction, thread, category) {
+  const channelId = String(tickets.get('tickets.staffConfig.logChannelId') || '');
+  if (!channelId || !interaction.guild?.id) return false;
+
+  try {
+    const currentLog = TicketLogs.status(interaction.guild.id);
+    if (currentLog.channels?.ticket_aberto !== channelId) {
+      TicketLogs.setChannel(interaction.guild.id, 'ticket_aberto', channelId);
+    }
+    const timestamp = Math.floor((thread.createdTimestamp || Date.now()) / 1000);
+    const link = `https://discord.com/channels/${interaction.guild.id}/${thread.id}`;
+    const embed = new EmbedBuilder()
+      .setColor('#22c55e')
+      .setTitle('Novo ticket aberto')
+      .setDescription(`${interaction.user} abriu um novo atendimento.`)
+      .addFields(
+        { name: 'Solicitante', value: `${interaction.user.tag || interaction.user.username || interaction.user.id}\nID: ${interaction.user.id}`, inline: true },
+        { name: 'Categoria', value: String(category || 'Atendimento').slice(0, 100), inline: true },
+        { name: 'Ticket', value: `[#${String(thread.name || thread.id).slice(0, 80)}](${link})\nID: ${thread.id}` },
+        { name: 'Aberto em', value: `<t:${timestamp}:F>`, inline: true }
+      )
+      .setTimestamp(new Date(thread.createdTimestamp || Date.now()));
+    return await TicketLogs.send(interaction.guild, 'ticket_aberto', embed);
+  } catch (error) {
+    console.error('[CreateTicket] Falha ao registrar abertura do ticket:', error);
+    return false;
+  }
+}
 
 function openForm(valor) {
   const functions = tickets.get('tickets.funcoes') || {};
@@ -69,6 +113,7 @@ async function CreateTicket(interaction, valor) {
     ]
   });
   tickets.set(`tickets.threadOwners.${thread.id}`, String(interaction.user.id));
+  recordTicketOpening(thread, interaction, ggg.nome || rawValue);
   const rowLink = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${thread.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
   await interaction.editReply({ content: '✅ Ticket criado com sucesso!', components: [rowLink] });
   const appearance = tickets.get('tickets.aparencia') || {};
@@ -85,6 +130,7 @@ async function CreateTicket(interaction, valor) {
   if (support) {
     await thread.send({ embeds: [purchasesEmbed(interaction.user.id, interaction.guild.id)], components: [...purchasePanel(interaction.user.id, interaction.guild.id), ...notProductPanel()] });
   }
+  await sendTicketOpenLog(interaction, thread, ggg.nome || rawValue);
   return true;
 }
 
@@ -166,6 +212,7 @@ async function createTicketFromModal(interaction) {
     ].filter(x => x.id)
   });
   tickets.set(`tickets.threadOwners.${thread.id}`, String(interaction.user.id));
+  recordTicketOpening(thread, interaction, ggg.nome || key);
   const appearance = tickets.get('tickets.aparencia') || {};
   const embed = new EmbedBuilder().setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) }).setTitle(ggg.nome || key)
     .setDescription(ggg.descricao || ggg.predescricao || 'Atendimento').addFields(
@@ -180,7 +227,8 @@ async function createTicketFromModal(interaction) {
   if (support) {
     await thread.send({ embeds: [purchasesEmbed(interaction.user.id, interaction.guild.id)], components: [...purchasePanel(interaction.user.id, interaction.guild.id), ...notProductPanel()] });
   }
+  await sendTicketOpenLog(interaction, thread, ggg.nome || key);
   const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setURL(`https://discord.com/channels/${interaction.guild.id}/${thread.id}`).setLabel('Ir para o Ticket').setStyle(ButtonStyle.Link));
   return interaction.editReply({ content: '✅ Ticket criado com sucesso!', components: [row] });
 }
-module.exports = { CreateTicket, createTicketFromModal, formCustomId, isSupportType, openForm };
+module.exports = { CreateTicket, createTicketFromModal, formCustomId, isSupportType, openForm, recordTicketOpening, sendTicketOpenLog };

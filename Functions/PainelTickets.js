@@ -1,5 +1,5 @@
-const { ButtonBuilder, ActionRowBuilder, EmbedBuilder } = require("discord.js")
-const { tickets } = require("../DataBaseJson")
+const { ButtonBuilder, ActionRowBuilder, EmbedBuilder, ChannelSelectMenuBuilder, ChannelType } = require("discord.js")
+const { tickets, configuracao } = require("../DataBaseJson")
 
 async function painelTicket(interaction) {
     const embed = new EmbedBuilder()
@@ -30,6 +30,15 @@ async function painelTicket(interaction) {
     if (typeof banner === 'string' && /^https?:\/\/\S+$/i.test(banner.trim())) {
         embed.setImage(banner.trim());
     }
+
+    const staffConfig = tickets.get('tickets.staffConfig') || {};
+    const transcriptChannelId = staffConfig.transcriptChannelId !== undefined
+        ? staffConfig.transcriptChannelId
+        : (configuracao.get('ConfigChannels.logpedidos') || configuracao.get('ConfigChannels.eventbuy') || '');
+    embed.addFields(
+        { name: '📣 Log de abertura', value: staffConfig.logChannelId ? `<#${staffConfig.logChannelId}>` : 'Não configurado.' },
+        { name: '📄 Canal do transcript HTML', value: transcriptChannelId ? `<#${transcriptChannelId}>` : 'Não configurado.' },
+    );
 
     const funcoes = tickets.get(`tickets.funcoes`);
 
@@ -101,6 +110,26 @@ async function painelTicket(interaction) {
 
         )
 
+    const rowLogChannel = new ActionRowBuilder()
+        .addComponents(
+            new ChannelSelectMenuBuilder()
+                .setCustomId('ticket_log_channel_select')
+                .setPlaceholder('Selecionar canal para logs de abertura')
+                .setChannelTypes(ChannelType.GuildText)
+                .setMinValues(1)
+                .setMaxValues(1)
+        );
+
+    const rowTranscriptChannel = new ActionRowBuilder()
+        .addComponents(
+            new ChannelSelectMenuBuilder()
+                .setCustomId('ticket_transcript_channel_select')
+                .setPlaceholder('Selecionar canal para transcripts HTML')
+                .setChannelTypes(ChannelType.GuildText)
+                .setMinValues(1)
+                .setMaxValues(1)
+        );
+
     const row4 = new ActionRowBuilder()
         .addComponents(
             new ButtonBuilder()
@@ -122,7 +151,7 @@ async function painelTicket(interaction) {
                 .setStyle(2)
         )
 
-    await interaction.update({ content: ``, embeds: [embed], components: [row2, row3, row4] })
+    await interaction.update({ content: ``, embeds: [embed], components: [row2, row3, rowLogChannel, rowTranscriptChannel, row4] })
 }
 
 
