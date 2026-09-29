@@ -1,10 +1,12 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { renderAutoEmojiAliases } = require('../Functions/RenderEmojiAliases');
 
 function emoji(name, id, animated = false) {
-  return { name, id, toString: () => `<${animated ? 'a' : ''}:${name}:${id}>` };
+  return { name, id, animated, toString: () => `<${animated ? 'a' : ''}:${name}:${id}>` };
 }
 
 async function main() {
@@ -46,6 +48,20 @@ async function main() {
     'com cache vazia, o helper deve buscar pelo nome e preservar apenas o nome que não existe'
   );
   assert.equal(fetchCount, 1, 'a consulta à lista de emojis deve ocorrer uma vez por servidor');
+
+  const configuredEmojis = [
+    { name: 'ea1', id: '1183841001824067676' },
+    { name: 'ea2', id: '1194131420499677317', animated: true }
+  ];
+  assert.equal(
+    await renderAutoEmojiAliases(':ea1::ea2:', { id: 'guild-configured', emojis: { cache: new Map() } }, configuredEmojis),
+    '<:ea1:1183841001824067676><a:ea2:1194131420499677317>',
+    'deve resolver nomes pelo registro persistido mesmo sem cache/API da guild'
+  );
+
+  const sender = fs.readFileSync(path.join(__dirname, '../Functions/SenderMessagesOrUpdates.js'), 'utf8');
+  assert.match(sender, /renderAutoEmojiAliases\(text, guild, configuracao\.get\('Emojis_EntregAuto'\)\)/,
+    'a publicação e sincronização devem usar a lista de emojis criada pelo comando');
 
   assert.equal(await renderAutoEmojiAliases('Texto normal', cachedGuild), 'Texto normal');
   assert.equal(await renderAutoEmojiAliases(':ea1:', null), ':ea1:');
