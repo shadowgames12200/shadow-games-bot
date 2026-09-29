@@ -12,6 +12,7 @@ const { Posicao1 } = require("../../Functions/PosicoesFunction.js");
 const { painelTicket } = require("../../Functions/PainelTickets.js");
 const { CreateMessageTicket, Checkarmensagensticket } = require("../../Functions/CreateMensagemTicket.js");
 const { CreateTicket } = require("../../Functions/CreateTicket.js");
+const TicketLogs = require("../../LogSuite.js");
 const { GerenciarCampos2 } = require("../../Functions/GerenciarCampos.js");
 const { MessageStock } = require("../../Functions/ConfigEstoque.js");
 
@@ -340,6 +341,24 @@ module.exports = {
 
 
         if (interaction.isChannelSelectMenu()) {
+
+            if (interaction.customId === 'ticket_log_channel_select') {
+                const channelId = interaction.values[0];
+                const current = tickets.get('tickets.staffConfig') || {};
+                tickets.set('tickets.staffConfig', { ...current, logChannelId: channelId });
+                try { TicketLogs.setChannel(interaction.guild.id, 'ticket_aberto', channelId); }
+                catch (error) { console.error('[TicketConfig] Falha ao sincronizar canal de abertura no LogSuite:', error); }
+                return await painelTicket(interaction);
+            }
+
+            if (interaction.customId === 'ticket_transcript_channel_select') {
+                const channelId = interaction.values[0];
+                const current = tickets.get('tickets.staffConfig') || {};
+                tickets.set('tickets.staffConfig', { ...current, transcriptChannelId: channelId });
+                try { TicketLogs.setChannel(interaction.guild.id, 'ticket_fechado', channelId); }
+                catch (error) { console.error('[TicketConfig] Falha ao sincronizar canal de fechamento no LogSuite:', error); }
+                return await painelTicket(interaction);
+            }
 
             if (interaction.customId == 'canalpostarticket') {
                 await interaction.reply({ content: `🔄 | Aguarde estamos criando sua mensagem!`, ephemeral: true });

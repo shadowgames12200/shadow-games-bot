@@ -12,6 +12,7 @@ const {
 const { configuracao, estatisticas, tickets } = require('./DataBaseJson');
 const { owner: configuredOwnerId } = require('./config.json');
 const { createTicketFromModal, CreateTicket, openForm } = require('./Functions/CreateTicket');
+const { collectMessages, renderTranscript } = require('./Functions/TicketTranscript');
 
 const QUICK_REPLIES = {
   pagamento: 'Olá! Vou verificar o pagamento e retorno com uma atualização em breve.',
@@ -38,10 +39,13 @@ function config() {
   const value = {
     title: 'Painel interno do atendimento',
     description: 'Use as opções abaixo para gerenciar este ticket.',
-    transcriptChannelId: configuracao.get('ConfigChannels.logpedidos') || configuracao.get('ConfigChannels.eventbuy') || '',
     staffRoleIds: [],
     quickReplies: QUICK_REPLIES,
-    ...current
+    ...current,
+    logChannelId: current.logChannelId || '',
+    transcriptChannelId: current.transcriptChannelId !== undefined
+      ? current.transcriptChannelId
+      : (configuracao.get('ConfigChannels.logpedidos') || configuracao.get('ConfigChannels.eventbuy') || '')
   };
   value.staffRoleIds = Array.isArray(value.staffRoleIds) ? value.staffRoleIds : [];
   value.quickReplies = { ...QUICK_REPLIES, ...(value.quickReplies || {}) };
@@ -239,10 +243,6 @@ async function handleClientInteraction(interaction) {
   return false;
 }
 
-function escapeHtml(value) {
-  return String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-}
-
 function storeProfile() {
   return {
     name: tickets.get('tickets.storeName') || configuracao.get('Config.NomeServidor') || 'Shadow Games',
@@ -260,7 +260,7 @@ function ratingRow(threadId) {
   );
 }
 
-function closedTicketCard(thread, closer, transcriptUrl) {
+function closedTicketCard(thread, closer, transcriptUrl, { includeRating = true } = {}) {
   const profile = storeProfile();
   const s = state(thread);
   const embed = new EmbedBuilder().setColor('#2ecc71').setTitle(`${profile.name} Ticket`).setDescription(
@@ -272,7 +272,7 @@ function closedTicketCard(thread, closer, transcriptUrl) {
     `Obrigado por usar o suporte!`
   ).setFooter({ text: profile.name });
   if (profile.icon && /^https?:\/\//i.test(profile.icon)) embed.setThumbnail(profile.icon);
-  const components = [ratingRow(thread.id)];
+  const components = includeRating ? [ratingRow(thread.id)] : [];
   if (transcriptUrl) components.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel('Abrir Transcript').setEmoji('↗').setStyle(ButtonStyle.Link).setURL(transcriptUrl)));
   return { embeds: [embed], components };
 }
@@ -287,48 +287,60 @@ async function handleRating(interaction) {
 }
 
 async function buildTranscript(thread) {
-  const messages = [...(await thread.messages.fetch({ limit: 100 })).values()].reverse();
-  const profile = storeProfile();
-  const guildName = thread.guild?.name || 'Servidor';
-  const channelName = String(thread.name || 'ticket').replace(/^[^#]*/, '').trim() || String(thread.name || 'ticket');
-  const ownerId = threadOwner(thread);
-  const stateInfo = state(thread);
-  const opener = ownerId ? `@${ownerId}` : 'Usuário';
-  const openedAt = messages[0]?.createdTimestamp || Date.now();
-  const date = new Date(openedAt).toLocaleString('pt-BR');
-  const avatarFor = message => {
-    try { return message.author?.displayAvatarURL?.({ extension: 'png', size: 64 }) || ''; } catch (_) { return ''; }
-  };
-  const messageRows = messages.map(message => {
-    const avatar = avatarFor(message);
-    const avatarHtml = avatar ? `<img class="avatar" src="${escapeHtml(avatar)}" alt="">` : '<div class="avatar avatar-fallback">●</div>';
-    const content = escapeHtml(message.cleanContent || '[anexo, imagem ou componente]').replace(/\n/g, '<br>');
-    const attachments = [...(message.attachments?.values?.() || [])].map(file => `<div class="attachment"><a href="${escapeHtml(file.url)}" target="_blank" rel="noreferrer">📎 ${escapeHtml(file.name || 'Anexo')}</a></div>`).join('');
-    return `<div class="message"><div class="avatar-wrap">${avatarHtml}</div><div class="message-body"><div class="author">${escapeHtml(message.author?.tag || 'Usuário')}<span class="timestamp">${new Date(message.createdTimestamp).toLocaleString('pt-BR')}</span></div><div class="content">${content}${attachments}</div></div></div>`;
-  }).join('\n');
-  const controls = ['Fechar Ticket', 'Assumir Ticket', 'Assumir Admin', 'Renomear Canal', 'Adicionar Membro', 'Remover Membro'].map(label => `<span class="control">${label}</span>`).join('');
-  const logo = profile.icon && /^https?:\/\//i.test(profile.icon) ? `<img class="logo" src="${escapeHtml(profile.icon)}" alt="">` : '';
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(channelName)}</title><style>
-:root{--bg:#f4f5f7;--card:#fff;--ink:#23272a;--muted:#747f8d;--line:#e4e7eb;--accent:#5865f2;--green:#43b581}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--ink)}.page{max-width:1040px;margin:0 auto;padding:28px 22px 48px}.brand{font-size:26px;font-weight:800;letter-spacing:.5px;margin:4px 0 22px;display:flex;align-items:center;gap:10px}.logo{width:34px;height:34px;border-radius:50%;object-fit:cover}.channel-title{font-size:24px;font-weight:700;margin:0 0 8px}.start{color:var(--muted);font-size:14px;margin-bottom:18px}.summary{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:18px 20px;box-shadow:0 1px 3px #0000000a}.summary-head{font-size:14px;margin-bottom:12px}.summary-head b{color:var(--accent)}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 26px;font-size:14px}.field-label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.4px}.field-value{font-weight:600;margin-top:3px}.controls{display:flex;gap:7px;flex-wrap:wrap;margin:16px 0 22px}.control{background:#e9eaed;color:#4f5660;border-radius:4px;padding:7px 10px;font-size:12px;font-weight:600}.messages{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 20px}.message{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid #f0f1f3}.message:last-child{border-bottom:0}.avatar-wrap{flex:0 0 40px}.avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#5865f2}.avatar-fallback{display:flex;align-items:center;justify-content:center;color:white;font-size:18px}.author{font-weight:700;font-size:14px}.timestamp{font-size:12px;color:var(--muted);font-weight:400;margin-left:9px}.content{font-size:14px;line-height:1.55;margin-top:5px;white-space:normal}.attachment{margin-top:8px}.attachment a{color:var(--accent);text-decoration:none}.footer{display:flex;justify-content:space-between;align-items:center;margin-top:22px;color:var(--muted);font-size:13px}.finished{color:var(--green);font-weight:700}@media(max-width:650px){.page{padding:18px 12px}.fields{grid-template-columns:1fr}.messages{padding:4px 12px}.timestamp{display:block;margin:4px 0 0}}
-</style></head><body><main class="page"><div class="brand">${logo}${escapeHtml(guildName)}</div><h1 class="channel-title">#🛠️┋${escapeHtml(channelName)}</h1><div class="start">This is the start of #🛠️┋${escapeHtml(channelName)} channel.</div><section class="summary"><div class="summary-head">TicketBot <span class="muted">${escapeHtml(date)}</span></div><div class="fields"><div><div class="field-label">Aberto por</div><div class="field-value">${escapeHtml(opener)}</div></div><div><div class="field-label">Motivo</div><div class="field-value">${escapeHtml(stateInfo.reason || 'Suporte')}</div></div><div><div class="field-label">Status</div><div class="field-value">${escapeHtml(stateInfo.status || 'Aberto')}</div></div><div><div class="field-label">ID do Ticket</div><div class="field-value">${escapeHtml(thread.id)}</div></div></div></section><div class="controls">${controls}</div><section class="messages">${messageRows || '<div class="message">Ticket sem mensagens.</div>'}</section><div class="footer"><span class="finished">Finalizado</span><span>Exported ${messages.length} messages.</span></div></main></body></html>`;
-  return { attachment: Buffer.from(html, 'utf8'), name: `transcript-${thread.id}.html` };
+  const { messages, incomplete, fetchError } = await collectMessages(thread);
+  const html = renderTranscript({
+    thread,
+    messages,
+    profile: storeProfile(),
+    stateInfo: state(thread),
+    ownerId: threadOwner(thread),
+    incomplete,
+    fetchError
+  });
+  return { attachment: Buffer.from(html, 'utf8'), name: `transcript-${thread.id}.html`, messageCount: messages.length, incomplete };
 }
 async function sendTranscript(interaction, finalized = false) {
   const attachment = await buildTranscript(interaction.channel);
   const c = config();
-  const owner = await interaction.client.users.fetch(threadOwner(interaction.channel)).catch(() => null);
+  const ownerId = threadOwner(interaction.channel);
+  const owner = ownerId ? await interaction.client.users.fetch(ownerId).catch(() => null) : null;
   const target = c.transcriptChannelId ? await interaction.client.channels.fetch(c.transcriptChannelId).catch(() => null) : null;
-  const sent = { channel: false, user: false };
+  const sent = { channel: false, user: false, transcript: false };
   let transcriptUrl = '';
   if (target?.isTextBased?.()) {
-    await target.send({ content: `📄 Transcript do ticket **${interaction.channel.name}** fechado por ${interaction.user}.`, files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] }).then(message => { sent.channel = true; transcriptUrl = message.attachments.first()?.url || ''; }).catch(error => console.error('[LegacyTicketStaff] transcript channel send failed', error));
+    await target.send({ content: `📄 Transcript HTML do ticket **${interaction.channel.name}**${finalized ? ` encerrado por ${interaction.user}.` : '.'}`, files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }] })
+      .then(message => {
+        const url = message.attachments?.first?.()?.url || '';
+        transcriptUrl = /^https:\/\/(?:cdn\.discordapp\.com|media\.discordapp\.net)\/attachments\//i.test(url) ? url : '';
+        sent.channel = Boolean(transcriptUrl);
+        sent.transcript = Boolean(transcriptUrl);
+      })
+      .catch(error => console.error('[LegacyTicketStaff] transcript channel send failed', error));
   }
-  const card = closedTicketCard(interaction.channel, interaction.user, transcriptUrl);
-  if (finalized && target?.isTextBased?.()) await target.send(card).catch(error => console.error('[LegacyTicketStaff] closing card channel send failed', error));
+
+  // Se o canal não estiver configurado ou não aceitar o arquivo, preserva ao menos
+  // uma cópia acessível ao solicitante e usa o link do anexo no cartão por DM.
+  if (finalized && !transcriptUrl && owner) {
+    await owner.send({
+      content: '📄 O canal de transcripts não está disponível. Estou enviando o arquivo diretamente nesta DM.',
+      files: [{ attachment: Buffer.from(attachment.attachment), name: attachment.name }]
+    }).then(message => {
+      const url = message.attachments?.first?.()?.url || '';
+      transcriptUrl = /^https:\/\/(?:cdn\.discordapp\.com|media\.discordapp\.net)\/attachments\//i.test(url) ? url : '';
+      sent.user = true;
+      sent.transcript = Boolean(transcriptUrl);
+    }).catch(error => console.error('[LegacyTicketStaff] transcript DM file fallback failed', error));
+  }
+
+  if (finalized && target?.isTextBased?.()) {
+    const channelCard = closedTicketCard(interaction.channel, interaction.user, transcriptUrl, { includeRating: false });
+    await target.send({ content: `✅ Transcript do ticket **${interaction.channel.name}**`, ...channelCard })
+      .catch(error => console.error('[LegacyTicketStaff] closing card channel send failed', error));
+  }
   if (owner) {
-    // O usuário recebe somente o cartão; o botão abre o HTML hospedado no canal de transcripts.
+    const card = closedTicketCard(interaction.channel, interaction.user, transcriptUrl);
     const payload = finalized
-      ? { ...card, content: transcriptUrl ? '📄 Seu ticket foi encerrado. Clique em **Abrir Transcript** para visualizar o atendimento no navegador.' : '📄 Seu ticket foi encerrado. O transcript não pôde receber um link porque o canal de transcripts não está configurado.' }
+      ? { ...card, content: transcriptUrl ? '📄 Seu ticket foi encerrado. Clique em **Abrir Transcript** para visualizar o atendimento no navegador.' : '📄 Seu ticket foi encerrado, mas não foi possível gerar um link para o transcript. Avise a equipe para que o arquivo seja enviado novamente.' }
       : { content: '📄 O transcript será disponibilizado no cartão final quando o ticket for encerrado.' };
     await owner.send(payload).then(() => { sent.user = true; }).catch(error => console.error('[LegacyTicketStaff] transcript DM failed', error));
   }
@@ -382,14 +394,37 @@ async function handle(interaction) {
       return interaction.reply({ content: `✅ Ticket assumido por ${interaction.user}. Status: **${s.status}**.` });
     }
     if (id === 'ticket_transcript') {
-      const result = await sendTranscript(interaction, false);
-      return interaction.reply({ content: `✅ Transcript HTML gerado.${result.sent.channel ? ' Enviado ao canal configurado.' : ''}${result.sent.user ? ' Enviado ao solicitante por DM.' : ' Não foi possível enviar DM ao solicitante.'}`, ephemeral: true });
+      await interaction.deferReply({ ephemeral: true });
+      try {
+        const result = await sendTranscript(interaction, false);
+        return interaction.editReply({ content: `✅ Transcript HTML gerado.${result.sent.channel ? ' Enviado ao canal configurado.' : ' Canal de transcripts indisponível.'}` });
+      } catch (error) {
+        console.error('[LegacyTicketStaff] transcript generation failed', error);
+        return interaction.editReply({ content: '❌ Não foi possível gerar o transcript. Verifique as permissões do bot e tente novamente.' });
+      }
     }
     if (id === 'ticket_close') {
       await interaction.deferReply({ ephemeral: true });
-      const result = await sendTranscript(interaction, true);
-      saveState(interaction.channel, { status: 'resolvido' });
-      await interaction.editReply({ content: `✅ Ticket fechado e transcript HTML gerado.${result.sent.channel ? ' Enviado ao canal configurado.' : ''}${result.sent.user ? ' Enviado ao solicitante por DM.' : ' Não foi possível enviar DM ao solicitante.'}` });
+      const previousState = state(interaction.channel);
+      saveState(interaction.channel, {
+        status: 'resolvido',
+        closedBy: interaction.user.id,
+        closedByTag: interaction.user.tag || interaction.user.username || String(interaction.user.id),
+        closedAt: Date.now()
+      });
+      let result;
+      try {
+        result = await sendTranscript(interaction, true);
+      } catch (error) {
+        tickets.set(`tickets.staffState.${interaction.channel.id}`, previousState);
+        console.error('[LegacyTicketStaff] transcript generation failed; ticket left open', error);
+        return interaction.editReply({ content: '❌ Não foi possível gerar o transcript; o ticket permaneceu aberto para não perder o histórico.' });
+      }
+      if (!result.sent.transcript) {
+        tickets.set(`tickets.staffState.${interaction.channel.id}`, previousState);
+        return interaction.editReply({ content: '❌ Não foi possível salvar o arquivo HTML no canal nem na DM. O ticket permaneceu aberto para preservar o histórico.' });
+      }
+      await interaction.editReply({ content: `✅ Ticket fechado e transcript HTML salvo.${result.sent.channel ? ' Enviado ao canal configurado.' : ' O arquivo foi enviado diretamente ao solicitante por DM.'}${result.sent.user ? ' Cartão enviado por DM.' : ''}` });
       return setTimeout(() => interaction.channel.delete(`Fechado e salvo por ${interaction.user.tag}`).catch(() => {}), 1000);
     }
   }
@@ -435,4 +470,4 @@ async function handle(interaction) {
 }
 
 function install(client) { client.on('interactionCreate', interaction => handle(interaction).catch(error => console.error('[LegacyTicketStaff]', error))); }
-module.exports = { install, staffPanel, publicPanel, handle, isLegacyThread, config };
+module.exports = { install, staffPanel, publicPanel, handle, isLegacyThread, config, buildTranscript, sendTranscript };
