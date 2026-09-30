@@ -12,7 +12,13 @@ function productDescription(config, guild) {
     const text = description == null || description === ''
         ? 'Faça sua compra automática abaixo!'
         : String(description);
-    return renderAutoEmojiAliases(text, guild, configuracao.get('Emojis_EntregAuto'));
+    const configuredEmojis = configuracao.get('Emojis_EntregAuto');
+    const aliasCount = (text.match(/:ea\d{1,2}:/gi) || []).length;
+    if (aliasCount) {
+        const registryCount = Array.isArray(configuredEmojis) ? configuredEmojis.length : 0;
+        console.info(`[ProductEmojiAliases] aliases=${aliasCount} registry=${registryCount}`);
+    }
+    return renderAutoEmojiAliases(text, guild, configuredEmojis);
 }
 
 const Entrega2 = configuracao.get(`Emojis_EntregAuto`)
@@ -163,7 +169,7 @@ async function MessageCreate(interaction, client) {
 
 
         if (yyy.Campos[0].desc !== '') {
-            embed.addFields({ name: `${yyy.Campos[0].Nome}`, value: await renderAutoEmojiAliases(yyy.Campos[0].desc.slice(0, 1024), interaction.guild), inline: true });
+            embed.addFields({ name: `${yyy.Campos[0].Nome}`, value: await renderAutoEmojiAliases(yyy.Campos[0].desc.slice(0, 1024), interaction.guild, configuracao.get('Emojis_EntregAuto')), inline: true });
         }
 
         embed.addFields(
@@ -232,6 +238,11 @@ async function UpdateMessageProduto(client, produto) {
 
 
     const ghgh = await produtos.get(produto)
+    if (!ghgh) throw new Error(`Produto não encontrado: ${produto}`);
+
+    const publishedMessages = Array.isArray(ghgh.mensagens) ? ghgh.mensagens : [];
+    const syncResult = { tracked: publishedMessages.length, updated: 0, failed: 0, deleted: 0 };
+    if (publishedMessages.length === 0) return syncResult;
 
 
     const embed = new EmbedBuilder()
@@ -284,8 +295,8 @@ async function UpdateMessageProduto(client, produto) {
 
         const style2row = new ActionRowBuilder().addComponents(selectMenuBuilder);
 
-        for (let iiiiii = 0; iiiiii < ghgh.mensagens.length; iiiiii++) {
-            const element = ghgh.mensagens[iiiiii];
+        for (let iiiiii = 0; iiiiii < publishedMessages.length; iiiiii++) {
+            const element = publishedMessages[iiiiii];
 
             try {
                 const channel = await client.channels.fetch(element.channelid)
@@ -299,26 +310,34 @@ async function UpdateMessageProduto(client, produto) {
                 )
 
                 await fetchedMessage.edit({ embeds: [embed], components: [style2row] })
+                syncResult.updated++;
             } catch (error) {
+                syncResult.failed++;
+                console.warn('[ProductPanelSync] Não foi possível atualizar uma mensagem publicada:', error.message);
                 const hhhh = produtos.get(`${produto}.mensagens`)
-                const indexToRemove = hhhh.findIndex(campo22 => campo22.mesageid === element.mesageid);
-                hhhh.splice(indexToRemove, 1);
-                produtos.set(`${produto}.mensagens`, hhhh)
+                if (Array.isArray(hhhh)) {
+                    const indexToRemove = hhhh.findIndex(campo22 => campo22.mesageid === element.mesageid);
+                    if (indexToRemove >= 0) {
+                        hhhh.splice(indexToRemove, 1);
+                        produtos.set(`${produto}.mensagens`, hhhh)
+                    }
+                }
             }
         }
 
+        return syncResult;
 
     } else {
 
         if (ghgh.Campos[0] == undefined) {
-            if (ghgh.mensagens == undefined) return produtos.set(`${produto}.mensagens`, [])
-            for (let iiiiii = 0; iiiiii < ghgh.mensagens.length; iiiiii++) {
-                const element = ghgh.mensagens[iiiiii];
+            for (const element of publishedMessages) {
                 const channel = await client.channels.fetch(element.channelid)
                 const fetchedMessage = await channel.messages.fetch(element.mesageid);
-                fetchedMessage.delete()
+                await fetchedMessage.delete()
+                syncResult.deleted++;
             }
             produtos.set(`${produto}.mensagens`, [])
+            return syncResult;
         }
 
         if (ghgh.Campos[0].desc !== '') {
@@ -347,7 +366,7 @@ async function UpdateMessageProduto(client, produto) {
         }
 
         if (ghgh.Campos[0].desc !== '') {
-            embed22.addFields({ name: `${ghgh.Campos[0].Nome}`, value: `${ghgh.Campos[0].desc}`, inline: true });
+            embed22.addFields({ name: `${ghgh.Campos[0].Nome}`, value: await renderAutoEmojiAliases(ghgh.Campos[0].desc.slice(0, 1024), null, configuracao.get('Emojis_EntregAuto')), inline: true });
         }
 
         embed22.addFields(
@@ -360,10 +379,8 @@ async function UpdateMessageProduto(client, produto) {
 
 
 
-        if (ghgh.mensagens?.length == undefined) return
-        if (ghgh.mensagens?.length == 0) return
-        for (let iiiiii = 0; iiiiii < ghgh.mensagens.length; iiiiii++) {
-            const element = ghgh.mensagens[iiiiii];
+        for (let iiiiii = 0; iiiiii < publishedMessages.length; iiiiii++) {
+            const element = publishedMessages[iiiiii];
 
 
             try {
@@ -400,14 +417,22 @@ async function UpdateMessageProduto(client, produto) {
 
 
                 await fetchedMessage.edit({ embeds: [embed22], components: [row2] })
+                syncResult.updated++;
             } catch (error) {
+                syncResult.failed++;
+                console.warn('[ProductPanelSync] Não foi possível atualizar uma mensagem publicada:', error.message);
                 const hhhh = produtos.get(`${produto}.mensagens`)
-                const indexToRemove = hhhh.findIndex(campo22 => campo22.mesageid === element.mesageid);
-                hhhh.splice(indexToRemove, 1);
-                produtos.set(`${produto}.mensagens`, hhhh)
+                if (Array.isArray(hhhh)) {
+                    const indexToRemove = hhhh.findIndex(campo22 => campo22.mesageid === element.mesageid);
+                    if (indexToRemove >= 0) {
+                        hhhh.splice(indexToRemove, 1);
+                        produtos.set(`${produto}.mensagens`, hhhh)
+                    }
+                }
             }
         }
 
+        return syncResult;
     }
 
 

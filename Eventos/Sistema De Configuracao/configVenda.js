@@ -121,9 +121,21 @@ module.exports = {
                 const ggg = await db.get(interaction.message.id)
 
                 await interaction.reply({ content: `🔄 Sincronizando mensagens...`, ephemeral: true }).then(async msg => {
-                    await UpdateMessageProduto(client, ggg.name)
-
-                    msg.edit({ content: `✅ Mensagens sincronizadas.` })
+                    try {
+                        const result = await UpdateMessageProduto(client, ggg.name);
+                        if (!result || result.tracked === 0) {
+                            await msg.edit({ content: `⚠️ Nenhuma mensagem pública deste produto está registrada para sincronização. Use “Postar” para criar um painel novo.` });
+                        } else if (result.deleted > 0) {
+                            await msg.edit({ content: `✅ ${result.deleted} painel(is) removido(s): o produto está sem campos configurados.` });
+                        } else if (result.updated > 0) {
+                            await msg.edit({ content: `✅ ${result.updated} mensagem(ns) sincronizada(s).${result.failed ? ` ${result.failed} falha(s); confira os logs.` : ''}` });
+                        } else {
+                            await msg.edit({ content: `⚠️ Nenhum painel foi atualizado (${result.failed} falha(s) em ${result.tracked} registro(s)). Confira os logs ou publique um painel novo.` });
+                        }
+                    } catch (error) {
+                        console.error('[ProductPanelSync] Falha ao sincronizar painéis:', error.message);
+                        await msg.edit({ content: `❌ Não foi possível sincronizar os painéis. Confira os logs e tente publicar um painel novo.` });
+                    }
 
                 })
             }

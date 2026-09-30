@@ -59,9 +59,31 @@ async function main() {
     'deve resolver nomes pelo registro persistido mesmo sem cache/API da guild'
   );
 
+  const archivedRegistry = [
+    { name: 'ea5', id: '1515606140652748932', animated: null },
+    { name: 'ea3', id: '1515606141453864972', animated: null },
+    { name: 'ea7', id: '1515606142921871393', animated: null },
+    { name: 'ea1', id: '1515606145660616744', animated: null },
+    { name: 'ea4', id: '1515606147137142834', animated: null },
+    { name: 'ea2', id: '1515606147921350740', animated: null },
+    { name: 'ea8', id: '1515606160886206615', animated: null },
+    { name: 'ea6', id: '1515606162643484702', animated: null }
+  ];
+  assert.equal(
+    await renderAutoEmojiAliases(':ea1::ea2::ea3::ea4::ea5::ea6::ea7::ea8:', null, archivedRegistry),
+    '<:ea1:1515606145660616744><:ea2:1515606147921350740><:ea3:1515606141453864972><:ea4:1515606147137142834><:ea5:1515606140652748932><:ea6:1515606162643484702><:ea7:1515606142921871393><:ea8:1515606160886206615>',
+    'deve converter os oito aliases com a estrutura exata do registro salvo no ZIP antigo'
+  );
+
   const sender = fs.readFileSync(path.join(__dirname, '../Functions/SenderMessagesOrUpdates.js'), 'utf8');
-  assert.match(sender, /renderAutoEmojiAliases\(text, guild, configuracao\.get\('Emojis_EntregAuto'\)\)/,
+  assert.match(sender, /renderAutoEmojiAliases\(text, guild, configuredEmojis\)/,
     'a publicação e sincronização devem usar a lista de emojis criada pelo comando');
+  assert.match(sender, /\[ProductEmojiAliases\] aliases=\$\{aliasCount\} registry=\$\{registryCount\}/,
+    'o diagnóstico deve registrar só contagens, nunca o texto da descrição');
+  assert.match(sender, /renderAutoEmojiAliases\(yyy\.Campos\[0\]\.desc\.slice\(0, 1024\), interaction\.guild, configuracao\.get\('Emojis_EntregAuto'\)\)/,
+    'o post inicial deve renderizar aliases também na descrição do campo');
+  assert.match(sender, /renderAutoEmojiAliases\(ghgh\.Campos\[0\]\.desc\.slice\(0, 1024\), null, configuracao\.get\('Emojis_EntregAuto'\)\)/,
+    'a sincronização deve renderizar aliases nos campos usando o registro salvo');
 
   assert.equal(await renderAutoEmojiAliases('Texto normal', cachedGuild), 'Texto normal');
   assert.equal(await renderAutoEmojiAliases(':ea1:', null), ':ea1:');
