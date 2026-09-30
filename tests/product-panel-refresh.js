@@ -23,4 +23,31 @@ assert.match(editHandler, /await UpdateMessageProduto\(client, ggg\.name\)/,
 assert.match(editHandler, /catch \(error\)[\s\S]*Não foi possível atualizar os painéis publicados/,
   'falha de edição pública deve ser registrada sem interromper a configuração');
 
+const salesSource = fs.readFileSync(
+  path.join(__dirname, '../Eventos/Sistema De Configuracao/configVenda.js'),
+  'utf8',
+);
+const syncStart = salesSource.indexOf("if (interaction.customId == 'syncproduto')");
+assert.notEqual(syncStart, -1, 'handler do botão Sincronizar deve existir');
+const syncEnd = salesSource.indexOf("if (interaction.customId == 'colocarvenda')", syncStart);
+assert.notEqual(syncEnd, -1, 'limite do handler de sincronização deve existir');
+const syncHandler = salesSource.slice(syncStart, syncEnd);
+assert.match(syncHandler, /const result = await UpdateMessageProduto\(client, ggg\.name\)/,
+  'o handler precisa receber a contagem real de mensagens sincronizadas');
+assert.match(syncHandler, /result\.tracked === 0[\s\S]*Use “Postar”/,
+  'quando não há mensagens vinculadas, deve orientar a publicar um painel novo');
+assert.match(syncHandler, /result\.updated > 0[\s\S]*result\.failed/,
+  'a confirmação deve informar atualizações e falhas reais');
+
+const senderSource = fs.readFileSync(
+  path.join(__dirname, '../Functions/SenderMessagesOrUpdates.js'),
+  'utf8',
+);
+assert.match(senderSource, /const syncResult = \{ tracked: publishedMessages\.length, updated: 0, failed: 0, deleted: 0 \}/,
+  'o atualizador deve iniciar com contagens explícitas');
+assert.match(senderSource, /if \(publishedMessages\.length === 0\) return syncResult/,
+  'sem IDs de mensagens salvos, o atualizador deve informar que não sincronizou nada');
+assert.match(senderSource, /syncResult\.updated\+\+/,
+  'cada mensagem editada deve ser contada como sincronizada');
+
 console.log('product-panel-refresh=ok');
