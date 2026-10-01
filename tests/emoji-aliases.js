@@ -59,6 +59,28 @@ async function main() {
     'deve resolver nomes pelo registro persistido mesmo sem cache/API da guild'
   );
 
+  let refreshCount = 0;
+  const liveGuildEmojis = new Map([
+    ['ea1-current', emoji('ea1', '123456789012345671')],
+    ['ea2-current', emoji('ea2', '123456789012345672')]
+  ]);
+  const guildWithStaleRegistry = {
+    id: 'guild-stale-registry',
+    emojis: {
+      cache: new Map(),
+      async fetch() { refreshCount++; this.cache = liveGuildEmojis; return liveGuildEmojis; }
+    }
+  };
+  assert.equal(
+    await renderAutoEmojiAliases(':ea1::ea2:', guildWithStaleRegistry, [
+      { name: 'ea1', id: '1515606145660616744' },
+      { name: 'ea2' }
+    ]),
+    '<:ea1:123456789012345671><:ea2:123456789012345672>',
+    'deve preferir IDs atuais da guild e não deixar registro salvo incompleto/antigo bloquear a busca'
+  );
+  assert.equal(refreshCount, 1, 'deve atualizar uma vez a cache da guild quando faltam emojis atuais');
+
   const archivedRegistry = [
     { name: 'ea5', id: '1515606140652748932', animated: null },
     { name: 'ea3', id: '1515606141453864972', animated: null },
