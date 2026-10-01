@@ -6,7 +6,6 @@ const {
 const { configuracao, tickets, estatisticas } = require('../DataBaseJson');
 const TicketLogs = require('../LogSuite');
 
-const aberturaCooldown = new Map();
 const FORM_PREFIX = 'ticket_open_form_';
 
 function normalize(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
@@ -91,9 +90,6 @@ async function CreateTicket(interaction, valor) {
   const ggg = entry?.[1] || tickets.get(`tickets.funcoes.${rawValue}`);
   if (!ggg || !Object.keys(ggg).length) return interaction.reply({ content: '❌ | Essa função não existe!', ephemeral: true });
   const support = isSupportType(ggg.nome || resolvedKey);
-  const last = aberturaCooldown.get(interaction.user.id) || 0;
-  if (Date.now() - last < 30000) return interaction.reply({ content: '⏳ | Aguarde alguns segundos antes de abrir outro ticket.', ephemeral: true });
-  aberturaCooldown.set(interaction.user.id, Date.now());
   await interaction.reply({ content: '🔄 | Aguarde estamos criando seu Ticket!', ephemeral: true });
   const existing = interaction.channel.threads.cache.find(x => x.name.includes(interaction.user.id));
   if (existing) {
@@ -182,9 +178,6 @@ function purchasesEmbed(userId, guildId) {
 }
 async function createTicketFromModal(interaction) {
   const formSupport = interaction.customId === `${FORM_PREFIX}support`;
-  const cooldown = aberturaCooldown.get(interaction.user.id) || 0;
-  if (Date.now() - cooldown < 30000) return interaction.reply({ content: '⏳ Aguarde alguns segundos antes de abrir outro ticket.', ephemeral: true });
-  aberturaCooldown.set(interaction.user.id, Date.now());
   await interaction.deferReply({ ephemeral: true });
   const functions = tickets.get('tickets.funcoes') || {};
   const entry = Object.entries(functions).find(([key, item]) => formSupport ? isSupportType(item?.nome || key) : !isSupportType(item?.nome || key));
