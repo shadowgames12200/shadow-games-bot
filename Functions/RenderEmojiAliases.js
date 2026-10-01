@@ -9,10 +9,13 @@ function valuesOf(collection) {
 }
 
 function findEmoji(collection, expectedName) {
+  let emoji;
   if (typeof collection?.find === 'function') {
-    return collection.find(item => String(item?.name || '').toLowerCase() === expectedName);
+    emoji = collection.find(item => String(item?.name || '').toLowerCase() === expectedName);
+  } else {
+    emoji = valuesOf(collection).find(item => String(item?.name || '').toLowerCase() === expectedName);
   }
-  return valuesOf(collection).find(item => String(item?.name || '').toLowerCase() === expectedName);
+  return emoji?.id && emoji?.name ? emoji : null;
 }
 
 function emojiMarkup(emoji) {
@@ -23,8 +26,8 @@ function emojiMarkup(emoji) {
 
 /**
  * Converts aliases such as :ea1: into Discord's required custom-emoji markup.
- * It first checks the target guild cache and fetches that guild's emoji list
- * by name if the cache is incomplete. Unknown aliases are preserved verbatim.
+ * It first checks/fetches current emojis from the target guild, then falls back
+ * to the saved registry. Unknown aliases are preserved verbatim.
  */
 async function renderAutoEmojiAliases(text, guild, configuredEmojis = []) {
   if (typeof text !== 'string' || !text) return text;
@@ -33,9 +36,8 @@ async function renderAutoEmojiAliases(text, guild, configuredEmojis = []) {
 
   let collection = guild?.emojis?.cache;
   const configured = valuesOf(configuredEmojis);
-  const findAvailable = (name, source = collection) => findEmoji(source, name) || findEmoji(configured, name);
-  const needsFetch = aliases.some(name => !findAvailable(name));
-  if (needsFetch && guild?.emojis && typeof guild.emojis.fetch === 'function') {
+  const needsGuildFetch = aliases.some(name => !findEmoji(collection, name));
+  if (needsGuildFetch && guild?.emojis && typeof guild.emojis.fetch === 'function') {
     const guildKey = String(guild.id || 'unknown');
     let fetchPromise = emojiFetches.get(guildKey);
     if (!fetchPromise) {
@@ -50,6 +52,7 @@ async function renderAutoEmojiAliases(text, guild, configuredEmojis = []) {
     collection = fetched || guild.emojis.cache || collection;
   }
 
+  const findAvailable = (name, source = collection) => findEmoji(source, name) || findEmoji(configured, name);
   const missingAliases = aliases.filter(name => !findAvailable(name, collection));
   if (missingAliases.length) {
     console.warn(`[RenderEmojiAliases] Aliases não encontrados em ${guild?.id || 'servidor desconhecido'}: ${missingAliases.join(', ')}`);
