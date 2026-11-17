@@ -585,7 +585,7 @@ module.exports = {
                 await interaction.update({ embeds: [], components: [], content: '🔄 Aguarde...' })
 
 
-                if (produtos.get(`${nome}`) !== null) return interaction.editReply({ content: `❌ | Opss, ja existe um produto com esse nome.` })//
+                if (produtos.has(nome)) return interaction.editReply({ content: `❌ | Opss, ja existe um produto com esse nome.` })
 
                 produtos.set(`${nome}`, {
                     Config: {
